@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Music Essentia | Indexplora</title>
+<meta name="description" content="Shape a musical idea into a production-ready creative brief with Indexplora Music Essentia.">
+<style>
+:root{color-scheme:dark;--bg:#080b18;--panel:#11172b;--line:#27304b;--ink:#f4f5ff;--muted:#a6afca;--pink:#ff6ac6;--blue:#68cfff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#24214b 0,transparent 42%),radial-gradient(ellipse at 90% 30%,#102f49 0,transparent 38%),var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif}
+main{max-width:1060px;margin:auto;padding:34px 22px 80px}.brand{letter-spacing:.18em;font-size:12px;color:var(--blue);font-weight:800}.hero{padding:64px 0 34px}.hero h1{font-size:clamp(42px,8vw,76px);line-height:1.02;letter-spacing:-.055em;margin:14px 0}.gradient{background:linear-gradient(90deg,var(--pink),var(--blue));color:transparent;background-clip:text}.hero p{max-width:650px;color:var(--muted);font-size:18px}
+.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}.panel{background:#11172beF;border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 18px 70px #0005}.panel h2{margin:0 0 18px;font-size:20px}label{display:block;color:#d8def2;font-size:13px;font-weight:700;margin:15px 0 7px}textarea,input,select{width:100%;background:#090f20;border:1px solid #303b5b;border-radius:12px;padding:13px;color:var(--ink);font:inherit}textarea{min-height:145px;resize:vertical}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.button{border:0;border-radius:999px;padding:14px 20px;background:linear-gradient(100deg,var(--pink),#8a9cff,var(--blue));color:#080b18;font-weight:900;cursor:pointer;margin-top:18px;width:100%;font-size:15px}.output{white-space:pre-wrap;color:#dce6ff;background:#090f20;border:1px solid var(--line);border-radius:14px;padding:16px;min-height:170px}.hint,.status{color:var(--muted);font-size:13px}.status{margin-top:12px}.pill{display:inline-block;border:1px solid #35405e;border-radius:99px;padding:5px 10px;color:#b9c8e8;font-size:12px;margin:4px 4px 0 0}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.hero{padding-top:42px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main>
+<div class="brand">INDEXPLORA ESSENTIA</div>
+<section class="hero"><span class="pill">MUSIC STUDIO · CREATIVE WORKSPACE</span><h1>Turn an idea into<br><span class="gradient">a sound universe.</span></h1><p>Describe the feeling, story and sound you imagine. Music Essentia turns it into a structured production brief that can be handed to a connected music-generation engine.</p></section>
+<section class="layout">
+<div class="panel"><h2>Create your music concept</h2>
+<label for="prompt">Your idea</label><textarea id="prompt" placeholder="Example: A cinematic orchestral pop anthem about humanity building a wiser, kinder civilization..."></textarea>
+<div class="grid"><div><label for="genre">Sound</label><select id="genre"><option>Cinematic orchestral pop</option><option>Electronic / synthwave</option><option>Ambient cinematic</option><option>Acoustic folk</option><option>R&B / soul</option><option>Rock</option><option>Classical</option></select></div>
+<div><label for="voice">Vocals</label><select id="voice"><option>Female lead vocal</option><option>Male lead vocal</option><option>Duet</option><option>Choir</option><option>Instrumental</option></select></div>
+<div><label for="language">Language</label><select id="language"><option>English</option><option>Thai</option><option>Instrumental / no lyrics</option></select></div>
+<div><label for="mood">Mood</label><select id="mood"><option>Hopeful and uplifting</option><option>Epic and triumphant</option><option>Reflective and emotional</option><option>Mysterious and atmospheric</option><option>Peaceful and meditative</option></select></div></div>
+<button class="button" id="make">Build production brief</button>
+<p class="hint">This creates a brief only. Audio generation becomes available after an authorized music engine is connected.</p>
+</div>
+<div class="panel"><h2>Studio output</h2><div class="output" id="output" aria-live="polite">Your production brief will appear here.</div><div class="status" id="status">Audio engine: not connected</div><div><span class="pill">Prompt design</span><span class="pill">Creative direction</span><span class="pill">Audio engine integration pending</span></div></div>
+</section></main>
+<script>
+const $=id=>document.getElementById(id);
+$('make').addEventListener('click',()=>{
+ const idea=$('prompt').value.trim();
+ if(!idea){$('status').textContent='Add a music idea first.';$('prompt').focus();return}
+ const brief=[
+ 'MUSIC ESSENTIA — PRODUCTION BRIEF','',
+ 'CONCEPT',idea,'',
+ 'GENRE / SOUND',$('genre').value,
+ 'VOCALS',$('voice').value,
+ 'LANGUAGE',$('language').value,
+ 'MOOD',$('mood').value,'',
+ 'ARRANGEMENT DIRECTION','Build a clear emotional arc: intimate opening, gradual rhythmic and harmonic lift, memorable central hook, contrasting bridge, and a resolved final section.',
+ 'MIX DIRECTION','Preserve vocal intelligibility, musical dynamics and separation between orchestral layers. Avoid clipping and excessive loudness.',
+ 'ENGINE STATUS','No audio-generation provider is connected yet.'
+ ].join('\n');
+ $('output').textContent=brief;
+ $('status').textContent='Production brief ready · Audio generation pending provider connection';
+});
+</script></body></html>
