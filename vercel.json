@@ -1,6 +1,0 @@
-{
-  "cleanUrls": false,
-  "rewrites": [
-    { "source": "/((?!assets/|music/|rebuild/|robots\\.txt|sitemap\\.xml).*)", "destination": "/index.html" }
-  ]
-}
