@@ -7,7 +7,14 @@ the existing app code; the page styles are copies kept in `fun-with-claude/asset
 - `/fun-with-claude/evolution-dash/`: Evolution Dash. Visitors press buttons (form, element, gift,
   art style, companion) and Claude creates an original, all-ages god, goddess or deity of creativity:
   SVG artwork, name, title and a mini-epic. "Evolve" adds a new influence and creates the next
-  stage (up to 9), with a stage timeline, PNG/SVG downloads and a saved "pantheon" gallery.
+  stage (up to 9), with a stage timeline and PNG/SVG downloads. Every creation and evolution is
+  published to the **public Pantheon** (Netlify Blobs store `fwc-pantheon`, shared by previews and
+  production) after an automatic all-ages safety check of all its text, including text in the art.
+  Anyone can browse it; the creator's device keeps only a private owner key (`fwc.dash.mine`) that
+  allows evolving or removing their own. Creations saved on a device by the earlier version are
+  moved to the Pantheon automatically and deleted from the device only after they're safely public.
+  `package.json` exists only so Netlify installs `@netlify/blobs` for this function; there is still
+  no build step.
   Only listed button values are accepted; the SVG is sanitised on the server and shown as an
   <img>, so it can't run code. Back end: `netlify/functions/fun-with-claude-dash.mts` at
   `POST /api/fun-with-claude/dash` (30 calls/minute per visitor).

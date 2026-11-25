@@ -1,0 +1,8 @@
+{
+  "name": "indexplorabyarvic",
+  "private": true,
+  "description": "Static site. Dependencies here are only for Netlify Functions (Fun with Claude); there is no build step.",
+  "dependencies": {
+    "@netlify/blobs": ">=8.1.0 <12"
+  }
+}
