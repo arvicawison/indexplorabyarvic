@@ -155,6 +155,7 @@ a{color:var(--blue)}
     <div id="sugs" aria-live="polite" aria-label="Suggestions"></div></div>
     <div class="crow">
       <select id="kind" aria-label="App type"><option value="app">Interactive app</option><option value="landing">Landing page</option><option value="dashboard">Dashboard</option><option value="tool">Calculator / tool</option><option value="game">Mini game</option><option value="form">Multi-step form</option><option value="assistant">AI-assistant style UI</option></select>
+      <select id="builders" aria-label="Parallel builders" title="How many builders write your app at the same time"><option value="20">20 builders</option><option value="12">12 builders</option><option value="8">8 builders</option><option value="4">4 builders</option><option value="0">1 builder (in parts)</option></select>
       <div class="pop"><button type="button" class="ib" id="mindsBtn" aria-expanded="false" aria-haspopup="true">Minds 8/8 ▾</button><div class="menu" id="mindsMenu" hidden></div></div>
       <button type="button" class="ib" id="sugBtn" aria-pressed="true" title="Live suggestions while you type">💡</button>
       <button type="button" class="ib" id="evoBtn" aria-pressed="true" title="Review every build and automatically improve weak ones">Self-improve</button>
@@ -370,6 +371,7 @@ a{color:var(--blue)}
   function stepHtml(s) {
     const icon = { run: "", ok: "✓", warn: "!", err: "✕" }[s.state];
     let det = "";
+    if (s.minis) det += `<div class="minis">${s.minis.map((m) => `<span class="mini ${m.state}" style="--c:${m.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${esc(m.name)}</span>`).join("")}</div>`;
     if (s.minds) det += `<div class="minis">${s.minds.map((m) => { const mm = MINDS.find((x) => x.id === m.id); return `<span class="mini ${m.state}" style="--c:${mm.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${mm.name}</span>`; }).join("")}</div>`;
     if (s.specs) det += s.specs.map((x) => { const mm = MINDS.find((m) => m.id === x.mind); return `<div class="spec" style="--c:${mm.color}"><b>${mm.name.toUpperCase()}</b>${md(x.text)}</div>`; }).join("");
     if (s.review) {
@@ -493,6 +495,78 @@ a{color:var(--blue)}
     c.updated = Date.now(); save(); renderAll();
   }
 
+  // ---------- parallel builders ----------
+  const BCOLORS = ["#38bdf8", "#34d399", "#f97316", "#ec4899", "#facc15", "#a78bfa", "#2dd4bf", "#f43f5e", "#60a5fa", "#4ade80"];
+  try { const b = store.get("fwc.builders"); if (b != null && [...$("builders").options].some((o) => o.value === b)) $("builders").value = b; } catch {}
+  $("builders").onchange = () => store.set("fwc.builders", $("builders").value);
+  const featuresOf = (c) => (Array.isArray(c.features) ? c.features : (c.features = c.messages.filter((m) => m.role === "user").map((m) => m.text.split("  ·  ")[0])));
+
+  // Assembles the shell and every module into one app. Each module's script is isolated, so one
+  // broken module can't stop the others, and its error names the module for the quality check.
+  function assemble(shell, modules, results) {
+    let body = shell.html || "<main></main>";
+    const leftovers = [];
+    for (const m of modules) {
+      const r = results[m.id];
+      let html = r?.html || "";
+      if (html && !new RegExp(`id=["']m-${m.id}["']`).test(html)) html = `<section id="m-${m.id}" class="module">${html}</section>`;
+      const mark = `<!--MODULE:${m.id}-->`;
+      if (body.includes(mark)) body = body.split(mark).join(html); else if (html) leftovers.push(html);
+    }
+    body = body.replace(/<!--MODULE:[^>]*-->/g, "");
+    if (leftovers.length) body = /<\/main>/i.test(body) ? body.replace(/<\/main>/i, leftovers.join("\n") + "</main>") : body + leftovers.join("\n");
+    const css = [shell.css || "", ...modules.map((m) => results[m.id]?.css ? `/* ${m.id} */\n${results[m.id].css}` : "")].join("\n");
+    const js = modules.filter((m) => results[m.id]?.js).map((m) => `<script>/* module: ${m.id} */(function(){try{\n${results[m.id].js}\n}catch(e){console.error("Module ${m.id} failed: "+e.message)}})();<\/script>`).join("\n");
+    const title = esc(shell.title || "App");
+    return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${title}</title>\n<style>\n${css}\n</style>\n</head>\n<body>\n${body}\n<script>/* runtime */\n${shell.js || "window.App={}"}\n<\/script>\n${js}\n</body>\n</html>`;
+  }
+
+  // RAM split: the Architect divides the app into modules, then all builders work at the same time.
+  async function parallelBuild(c, steps, { text, blueprint, n, fixes, plan }) {
+    const label = fixes ? "Improving" : "Building";
+    let shell, modules;
+    if (plan) ({ shell, modules } = plan);
+    else {
+      const a = { label: `Architect: splitting the app into ${n} modules`, state: "run" }; steps.push(a); renderThreadSoon();
+      const s0 = performance.now();
+      const r = await (await api({ mode: "architect", prompt: text, kind: c.kind, builders: n, blueprint, features: featuresOf(c) })).json();
+      shell = r.shell; modules = r.modules; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
+      Object.assign(a, { label: `Architect split "${shell.title || c.title}" into ${modules.length} modules`, state: "ok", meta: secs(performance.now() - s0), text: modules.map((m, i) => `${i + 1}. **${m.name}**: ${m.purpose}${m.listens?.length ? " (listens: " + m.listens.join(", ") + ")" : ""}`).join("\n") });
+      log("ok", `Architect planned ${modules.length} modules`, performance.now() - s0);
+    }
+    const n2 = (c.versions[c.versions.length - 1]?.n || 0) + 1;
+    const b = { label: `${modules.length} builders ${fixes ? "improving" : "writing"} v${n2} in parallel`, state: "run", minis: modules.map((m, i) => ({ id: m.id, name: m.name, color: BCOLORS[i % BCOLORS.length], state: "run" })) };
+    steps.push(b); renderThreadSoon();
+    const s1 = performance.now(), results = {};
+    let done = 0;
+    renderPanel(`/* ${modules.length} builders are writing their modules at the same time… */`);
+    await Promise.all(modules.map(async (m, i) => {
+      const mini = b.minis[i], t = performance.now();
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const r = await (await api({ mode: "module", prompt: text, kind: c.kind, features: featuresOf(c), module: m, shell, modules: modules.map(({ id, name, emits, listens }) => ({ id, name, emits, listens })), fixes: fixes || undefined })).json();
+          results[m.id] = r; mini.state = "ok"; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
+          log("ok", `Builder ${i + 1} finished "${m.name}"`, performance.now() - t); break;
+        } catch (e) {
+          if (e.name === "AbortError") throw e;
+          if (attempt === 1 && /busy|Too many|429|502|504/i.test(e.message + e.code)) { await wait(1500 + Math.random() * 1500); continue; }
+          mini.state = "err"; log("warn", `Builder ${i + 1} ("${m.name}"): ${e.message}`); break;
+        }
+      }
+      done++; b.meta = `${done}/${modules.length}`; renderPanel(`/* ${done} of ${modules.length} modules ready… */`); renderThreadSoon(); renderUsage();
+    }));
+    const ok = modules.filter((m) => results[m.id]).length;
+    if (!ok) { b.state = "err"; throw new Error("No builder could finish a module. Check Activity for details."); }
+    const html = assemble(shell, modules, results);
+    const ms = performance.now() - s1; stats.buildMs.push(ms);
+    const v = { n: n2, html, at: Date.now(), prompt: text, plan: { shell, modules } };
+    c.versions.push(v); c.blueprint = blueprint; c.updated = Date.now(); shownVersion = n2; view = "preview";
+    Object.assign(b, { label: `${label === "Building" ? "Built" : "Improved"} v${n2}: ${ok} of ${modules.length} modules assembled`, state: ok === modules.length ? "ok" : "warn", meta: `${html.length.toLocaleString()} chars · ${secs(ms)}`, version: n2, open: true });
+    log(ok === modules.length ? "ok" : "warn", `Assembled v${n2} from ${ok}/${modules.length} modules`, ms);
+    save(); renderAll();
+    return v;
+  }
+
   // ---------- toggles ----------
   const pref = (k, d) => { const v = store.get(k); return v == null ? d : v === "1"; };
   let evolve = pref("fwc.evolve", true), suggestOn = pref("fwc.suggest", true);
@@ -579,7 +653,7 @@ a{color:var(--blue)}
       const before = raw.length;
       try {
         const res = await api(part === 1
-          ? { mode: "build", prompt: text, kind: c.kind, specs, blueprint, previousHtml: base ? base.html : "", fixes: fixes || "" }
+          ? { mode: "build", prompt: text, kind: c.kind, specs, blueprint, previousHtml: base ? base.html : "", fixes: fixes || "", features: featuresOf(c) }
           : { mode: "continue", prompt: text, kind: c.kind, specs: [], blueprint, partialHtml: raw });
         const reader = res.body.getReader(), dec = new TextDecoder(); let last = 0;
         while (true) {
@@ -617,7 +691,7 @@ a{color:var(--blue)}
     found.forEach((f) => log("warn", "Lint: " + f));
     const rv = { label: `Reviewing v${v.n}: quality and foresight`, state: "run" }; steps.push(rv); renderThreadSoon();
     try {
-      const r = await (await api({ mode: "review", prompt: text, kind: c.kind, html: v.html, runtimeErrors: errs, lint: found })).json();
+      const r = await (await api({ mode: "review", prompt: text, kind: c.kind, html: v.html, runtimeErrors: errs, lint: found, features: featuresOf(c) })).json();
       const review = r.review; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
       Object.assign(rv, { label: `Quality review v${v.n}: ${review.score}/100`, state: review.score >= 85 ? "ok" : "warn", review, open: review.score < 85 });
       v.score = review.score;
@@ -645,6 +719,7 @@ a{color:var(--blue)}
     if (!c) c = newChat(text.length > 48 ? text.slice(0, 46) + "…" : text, kind);
     const refining = c.versions.length > 0;
     const base = refining ? c.versions[c.versions.length - 1] : null;
+    featuresOf(c); c.features.push(text);
     c.messages.push({ role: "user", text: refining ? text : text + "  ·  " + KIND_LABEL[kind] });
     const steps = []; c.messages.push({ role: "assistant", steps });
     $("prompt").value = ""; busy = true; controller = new AbortController();
@@ -662,7 +737,7 @@ a{color:var(--blue)}
         await Promise.all(plan.minds.map(async (m) => {
           const s = performance.now(); const name = MINDS.find((x) => x.id === m.id).name;
           try {
-            const r = await (await api({ mode: "mind", mind: m.id, prompt: text, kind: c.kind, blueprint: c.blueprint })).json();
+            const r = await (await api({ mode: "mind", mind: m.id, prompt: text, kind: c.kind, blueprint: c.blueprint, features: featuresOf(c) })).json();
             m.state = "ok"; plan.specs.push({ mind: m.id, text: r.text }); usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
             stats.mindMs.push(performance.now() - s); log("ok", `${name} planned`, performance.now() - s);
           } catch (e) { m.state = "err"; if (e.name !== "AbortError") log(e.code === "authentication_required" ? "error" : "warn", `${name}: ${e.message}`); if (e.code === "authentication_required") plan.auth = true; }
@@ -681,7 +756,7 @@ a{color:var(--blue)}
         const h = { label: "Huddle: merging ideas into one blueprint", state: "run" }; steps.push(h); renderThreadSoon();
         const s = performance.now();
         try {
-          const r = await (await api({ mode: "huddle", prompt: text, kind: c.kind, specs, blueprint: c.blueprint })).json();
+          const r = await (await api({ mode: "huddle", prompt: text, kind: c.kind, specs, blueprint: c.blueprint, features: featuresOf(c) })).json();
           blueprint = r.blueprint; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
           Object.assign(h, { label: "Shared blueprint agreed", state: "ok", meta: secs(performance.now() - s), text: blueprint });
           log("ok", "Huddle agreed a blueprint", performance.now() - s);
@@ -691,10 +766,17 @@ a{color:var(--blue)}
         }
         renderThreadSoon(); renderUsage();
       }
-      // 3) build
+      // 3) build: parallel builders (RAM split), falling back to one builder in parts
+      const nBuilders = +$("builders").value;
+      if (featuresOf(c).length > 1) steps.push({ label: `Feature ledger: ${featuresOf(c).length} features kept and connected`, state: "ok", text: featuresOf(c).map((f, i) => `${i + 1}. ${f}`).join("\n") });
       let v;
-      try { v = await buildVersion(c, steps, { text, specs, blueprint, base, label: "Building" }); }
-      catch (e) { if (e.name === "AbortError") throw e; fail("Build failed", e.message); return; }
+      try {
+        if (nBuilders > 0) {
+          try { v = await parallelBuild(c, steps, { text, blueprint, n: nBuilders }); }
+          catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Parallel build unavailable: switching to one builder", state: "warn", text: e.message }); log("warn", "Parallel build: " + e.message); }
+        }
+        if (!v) v = await buildVersion(c, steps, { text, specs, blueprint, base, label: "Building" });
+      } catch (e) { if (e.name === "AbortError") throw e; fail("Build failed", e.message); return; }
       showApp();
       // 4) check, review and foresee; 5) one automatic improvement pass if needed
       if (evolve) {
@@ -705,7 +787,7 @@ a{color:var(--blue)}
           steps.push({ label: "Self-improving: fixing what the checks found", state: "ok", text: fixes });
           log("info", `Self-improve: v${v.n} → v${v.n + 1}`);
           try {
-            const v2 = await buildVersion(c, steps, { text, specs: [], blueprint, base: v, fixes, label: "Improving" });
+            const v2 = v.plan ? await parallelBuild(c, steps, { text, blueprint, n: v.plan.modules.length, fixes, plan: v.plan }) : await buildVersion(c, steps, { text, specs: [], blueprint, base: v, fixes, label: "Improving" });
             const res2 = await checkVersion(c, steps, v2, text);
             if (res.review && res2.review) log(res2.review.score >= res.review.score ? "ok" : "warn", `Self-improve: score ${res.review.score} → ${res2.review.score}`);
           } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + v.n, state: "warn", text: e.message }); log("warn", "Self-improve: " + e.message); }

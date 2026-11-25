@@ -7,6 +7,8 @@
 //   mode "suggest" -> live prompt suggestions while the user types (JSON)
 //   mode "showcase_publish" / "showcase_remove" -> share an app in (or remove it from) the public Showcase
 //   mode "showcase_list" / "showcase_get" -> browse the public Showcase (anyone can read)
+//   mode "architect" -> splits the app into up to 20 modules + a shared shell (design tokens, layout, event bus)
+//   mode "module" -> one of up to 20 parallel builders writes one module against that contract
 //   mode "continue" -> continues a build that was cut off (large apps are built in parts)
 //
 // Owner controls (Netlify > Site configuration > Environment variables, scope: Functions):
@@ -210,7 +212,7 @@ export default async (req: Request, context: any) => {
     const prev = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
     const r = await claude(base, key, {
       model, max_tokens: 600, system: `${MIND_SHARED}\n\n${mind.prompt}`,
-      messages: [{ role: "user", content: prev ? `${request}\n\nThis refines an existing app. Build on its current blueprint rather than starting over:\n\n${prev}` : request }],
+      messages: [{ role: "user", content: prev ? `${request}${ledger(body?.features)}\n\nThis refines an existing app. Build on its current blueprint rather than starting over:\n\n${prev}` : request }],
     });
     if (!r.ok) { log({ who, mode: "mind", mind: body.mind, kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
     const data: any = await r.json();
@@ -225,7 +227,7 @@ export default async (req: Request, context: any) => {
     const prev = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
     const r = await claude(base, key, {
       model, max_tokens: 700, system: HUDDLE,
-      messages: [{ role: "user", content: `${request}\n\n${prev ? "Previous blueprint (update it, don't discard what still works):\n" + prev + "\n\n" : ""}The minds' specs:\n\n${specs.join("\n\n")}` }],
+      messages: [{ role: "user", content: `${request}${ledger(body?.features)}\n\n${prev ? "Previous blueprint (update it, don't discard what still works):\n" + prev + "\n\n" : ""}The minds' specs:\n\n${specs.join("\n\n")}` }],
     });
     if (!r.ok) { log({ who, mode: "huddle", kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
     const data: any = await r.json();
@@ -241,7 +243,7 @@ export default async (req: Request, context: any) => {
     const lint = (Array.isArray(body?.lint) ? body.lint : []).slice(0, 15).map((e: any) => String(e).slice(0, 200));
     const r = await claude(base, key, {
       model, max_tokens: 1200, system: REVIEW,
-      messages: [{ role: "user", content: `${request}\n\nRuntime errors seen in the preview: ${runtime.length ? runtime.join(" | ") : "none"}\nLint findings: ${lint.length ? lint.join(" | ") : "none"}\n\nThe app:\n\n${html}` }],
+      messages: [{ role: "user", content: `${request}${ledger(body?.features)}\n\nRuntime errors seen in the preview: ${runtime.length ? runtime.join(" | ") : "none"}\nLint findings: ${lint.length ? lint.join(" | ") : "none"}\n\nThe app:\n\n${html}` }],
     });
     if (!r.ok) { log({ who, mode: "review", outcome: "upstream_" + r.status }); return upstreamError(r.status); }
     const data: any = await r.json();
@@ -274,19 +276,63 @@ export default async (req: Request, context: any) => {
     return json({ suggestions, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
   }
 
+  if (body?.mode === "architect") {
+    const n = Math.max(3, Math.min(20, Math.round(Number(body?.builders) || 20)));
+    const blueprint = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
+    const r = await claude(base, key, {
+      model, max_tokens: 2600, system: ARCHITECT,
+      messages: [{ role: "user", content: `${request}${ledger(body?.features)}\n\nNumber of modules (parallel builders): ${n}\n\n${blueprint ? "Shared blueprint from the minds' huddle:\n" + blueprint : ""}` }],
+    }, 27000);
+    if (!r.ok) { log({ who, mode: "architect", outcome: "upstream_" + r.status }); return upstreamError(r.status); }
+    const { text, usage, stop } = await textOf(r);
+    const modules = parseJson(tagged(text, "modules"), []);
+    const seen = new Set<string>();
+    const clean = (Array.isArray(modules) ? modules : []).map((m: any) => ({
+      id: String(m?.id || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 30),
+      name: String(m?.name || "").slice(0, 60), purpose: String(m?.purpose || "").slice(0, 200), spec: String(m?.spec || "").slice(0, 800),
+      emits: (Array.isArray(m?.emits) ? m.emits : []).map(String).slice(0, 8), listens: (Array.isArray(m?.listens) ? m.listens : []).map(String).slice(0, 8),
+      features: (Array.isArray(m?.features) ? m.features : []).map(Number).filter(Number.isFinite).slice(0, 10),
+    })).filter((m: any) => m.id && m.name && !seen.has(m.id) && seen.add(m.id)).slice(0, n);
+    const shell = { title: tagged(text, "title").replace(/<[^>]*>/g, "").slice(0, 80), css: tagged(text, "shell_css"), html: tagged(text, "shell_html"), js: tagged(text, "shell_js") };
+    if (clean.length < 2 || !shell.html || !shell.js) { log({ who, mode: "architect", outcome: "unparseable", stop, modules: clean.length }); return json({ error: "architect_unreadable", message: "The Architect's plan came back incomplete." }, 502); }
+    log({ who, mode: "architect", kind, outcome: "ok", modules: clean.length, stop, in: usage?.input_tokens, out: usage?.output_tokens });
+    return json({ shell, modules: clean, usage: { in: usage?.input_tokens ?? 0, out: usage?.output_tokens ?? 0 } });
+  }
+
+  if (body?.mode === "module") {
+    const m = body?.module || {}, shell = body?.shell || {};
+    const id = String(m.id || "").replace(/[^a-z0-9-]/g, "").slice(0, 30);
+    if (!id) return json({ error: "module_required" }, 400);
+    const others = (Array.isArray(body?.modules) ? body.modules : []).slice(0, 20).map((o: any) => `- ${String(o?.id).slice(0, 30)}: ${String(o?.name).slice(0, 60)} (emits ${(o?.emits || []).join(", ") || "nothing"}; listens ${(o?.listens || []).join(", ") || "nothing"})`).join("\n");
+    const contract = `App name: ${String(shell.title || "").slice(0, 80)}\n\nShell CSS (variables and classes you can use):\n${String(shell.css || "").slice(0, 5000)}\n\nShell layout (your module replaces <!--MODULE:${id}-->):\n${String(shell.html || "").slice(0, 3000)}\n\nRuntime (window.App):\n${String(shell.js || "").slice(0, 3000)}\n\nAll modules being built in parallel:\n${others}`;
+    const fixes = typeof body?.fixes === "string" ? `\n\nA review of the previous build found these problems; make sure your module avoids or fixes them:\n${body.fixes.slice(0, 2500)}` : "";
+    const r = await claude(base, key, {
+      model: Netlify.env.get("FUN_CLAUDE_BUILDER_MODEL") || "claude-haiku-5-5", max_tokens: 1800, system: BUILDER.replace(/ID/g, id),
+      messages: [{ role: "user", content: `${request}${ledger(body?.features)}\n\n${contract}\n\nYOUR MODULE\nid: ${id}\nname: ${String(m.name || "").slice(0, 60)}\npurpose: ${String(m.purpose || "").slice(0, 200)}\nspec: ${String(m.spec || "").slice(0, 800)}\nemits: ${(m.emits || []).join(", ")}\nlistens: ${(m.listens || []).join(", ")}${fixes}` }],
+    }, 27000);
+    if (!r.ok) { log({ who, mode: "module", module: id, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
+    const { text, usage, stop } = await textOf(r);
+    const out = { html: tagged(text, "html"), css: tagged(text, "css"), js: tagged(text, "js") };
+    if (!out.html && !out.js) { log({ who, mode: "module", module: id, outcome: "unparseable", stop }); return json({ error: "module_unreadable", message: "This builder's module came back empty." }, 502); }
+    log({ who, mode: "module", module: id, outcome: "ok", stop, in: usage?.input_tokens, out: usage?.output_tokens });
+    return json({ id, ...out, usage: { in: usage?.input_tokens ?? 0, out: usage?.output_tokens ?? 0 } });
+  }
+
   if (body?.mode === "build" || body?.mode === "continue") {
     const partial = body?.mode === "continue" && typeof body?.partialHtml === "string" ? body.partialHtml.slice(-60000) : "";
     if (body?.mode === "continue" && !partial) return json({ error: "partial_required" }, 400);
     const specs = cleanSpecs(body?.specs);
     const blueprint = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
     const previous = typeof body?.previousHtml === "string" ? body.previousHtml.slice(0, 40000) : "";
-    let user = `${request}\n\n${blueprint ? "Shared blueprint (follow this):\n" + blueprint + "\n\n" : ""}${specs.length ? "The minds' specs:\n\n" + specs.join("\n\n") : "(No specs: use your own judgement.)"}`;
+    let user = `${request}${ledger(body?.features)}\n\n${blueprint ? "Shared blueprint (follow this):\n" + blueprint + "\n\n" : ""}${specs.length ? "The minds' specs:\n\n" + specs.join("\n\n") : "(No specs: use your own judgement.)"}`;
     if (previous) user += `\n\nThis is a refinement. Here is the current version; keep what works and apply the request:\n\n${previous}`;
     const fixes = typeof body?.fixes === "string" ? body.fixes.slice(0, 4000) : "";
     if (fixes) user += `\n\nSelf-improvement pass. A review of the current version found these problems; fix all of them while keeping everything that works:\n${fixes}`;
     if (partial) user += `\n\nYou already started writing the app but were cut off. Here is everything written so far:\n\n${partial}\n\nContinue EXACTLY from the last character above. Output only the remaining code, without repeating anything already written and without any explanation, and finish with </html>.`;
 
-    const r = await claude(base, key, { model, max_tokens: 8000, stream: true, system: CONDUCTOR, messages: [{ role: "user", content: user }] });
+    // Each part is capped so it always finishes inside the plan's ~30s request limit, even if the
+    // reply arrives all at once instead of streaming. Large apps simply take more parts.
+    const r = await claude(base, key, { model, max_tokens: Number(Netlify.env.get("FUN_CLAUDE_PART_TOKENS") || 2600), stream: true, system: CONDUCTOR, messages: [{ role: "user", content: user }] }, 26000);
     if (!r.ok || !r.body) { log({ who, mode: "build", kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
 
     // Turn Anthropic's event stream into a plain text stream of the HTML as it is written.
@@ -296,10 +342,11 @@ export default async (req: Request, context: any) => {
     const stream = new ReadableStream({
       async pull(ctrl) {
         while (true) {
-          const { value, done } = await upstream.read();
+          const left = Number(Netlify.env.get("FUN_CLAUDE_PART_MS") || 24000) - (Date.now() - started);
+          const next: any = left > 0 ? await Promise.race([upstream.read(), new Promise((res) => setTimeout(() => res({ timeout: true }), left))]) : { timeout: true };
+          if (next.timeout) { upstream.cancel().catch(() => {}); log({ who, mode: body.mode, kind, outcome: "part_done", in: inTokens, out: outTokens }); ctrl.close(); return; }
+          const { value, done } = next;
           if (done) { log({ who, mode: body.mode, kind, specs: specs.length, refine: !!previous, outcome: "ok", stop, in: inTokens, out: outTokens }); ctrl.close(); return; }
-          // Stay inside the plan's request limit (30s on Netlify Free): stop cleanly so the page asks for the next part.
-          if (Date.now() - started > Number(Netlify.env.get("FUN_CLAUDE_PART_MS") || 22000)) { upstream.cancel().catch(() => {}); log({ who, mode: body.mode, kind, outcome: "part_done", in: inTokens, out: outTokens }); ctrl.close(); return; }
           buf += dec.decode(value, { stream: true });
           let i, emitted = false;
           while ((i = buf.indexOf("\n\n")) >= 0) {
@@ -334,6 +381,54 @@ function cleanId(v: unknown) { const s = String(v || ""); return /^\d{13}-[a-z0-
 function rand(n: number) { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join(""); }
 async function ownerHash(k: string) { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("fwc-showcase:" + k)); return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join(""); }
 
+// Every feature asked for so far in this chat. All must stay present and reinforce each other.
+function ledger(list: unknown) {
+  const f = (Array.isArray(list) ? list : []).filter((x: any) => typeof x === "string" && x.trim()).slice(-30).map((x: string) => x.trim().slice(0, 300));
+  return f.length ? `\n\nFeatures requested so far in this chat (ALL must be present and working, and they should connect so each one makes the others better):\n${f.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : "";
+}
+
+const ARCHITECT = `You are the Architect of "Fun with Claude: AI App & UI Generator". Up to 20 builders will write the
+app IN PARALLEL, each writing one module without seeing the others' code. Design the split and the shared
+contract so their work fits together perfectly and the features reinforce each other.
+
+Output EXACTLY these tags and nothing else:
+<title>the app's name</title>
+<shell_css>Global CSS only: :root design tokens (--c-bg, --c-surface, --c-text, --c-muted, --c-accent, --c-accent-2,
+--space-1..5, --radius, --shadow, --font), base element styles, the page layout grid, buttons/inputs/cards
+classes (.btn, .btn-primary, .card, .field, .chip), focus styles, responsive rules, prefers-reduced-motion.</shell_css>
+<shell_html>Only the body content: a semantic layout (header, nav if useful, main, footer) with exactly one
+placeholder comment <!--MODULE:id--> per module where it mounts. No <html>, <head> or <body> tags.</shell_html>
+<shell_js>A tiny runtime in plain JS (under 50 lines) defining window.App with: state (object), on(evt, fn),
+emit(evt, data), get(key), set(key, value) which emits "change:"+key, store.get/store.set (localStorage
+wrapped in try/catch with an in-memory fallback), toast(message). No other code.</shell_js>
+<modules>A JSON array, one object per module: {"id": "kebab-case", "name": "...", "purpose": "one line",
+"spec": "2-4 sentences: exactly what it renders and does", "emits": ["event"], "listens": ["event"],
+"features": [numbers of the features it serves]}</modules>
+
+Rules: use exactly the requested number of modules unless the app is genuinely tiny (never fewer than 3);
+every requested feature is served by at least one module; modules talk only through App events and
+App.get/App.set, so data flows between features; keep the shell compact (under about 1,600 tokens).
+
+${SAFETY}`;
+
+const BUILDER = `You are one of up to 20 parallel Builders in "Fun with Claude: AI App & UI Generator". Write ONLY your
+module, against the Architect's shared contract. Other builders write the other modules at the same time.
+
+Output EXACTLY these tags and nothing else:
+<html>your module's markup: one root element <section id="m-ID" class="module"> ... </section> (replace ID)</html>
+<css>styles for your module only; start EVERY selector with #m-ID; use the shell's CSS variables and classes</css>
+<js>plain JavaScript body (it is wrapped in a function for you): const root = document.getElementById("m-ID");
+query elements only inside root; share data only via App.on/App.emit/App.get/App.set/App.store; no globals,
+no network, no external files</js>
+
+Make it polished and fully working: real interactivity, labels, focus states, empty/error states, responsive,
+accessible (WCAG 2.2 AA). Keep it under about 1,400 tokens in total.
+
+${SAFETY}`;
+
+function tagged(text: string, t: string) { return (text.match(new RegExp(`<${t}>([\\s\\S]*?)</${t}>`, "i"))?.[1] ?? "").trim(); }
+async function textOf(r: Response) { const d: any = await r.json(); return { text: (d?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join(""), usage: d?.usage, stop: d?.stop_reason }; }
+
 function parseJson(text: string, fallback: any) {
   const t = text.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
   try { return JSON.parse(t); } catch {}
@@ -349,9 +444,9 @@ function cleanSpecs(list: unknown): string[] {
     .map((s: any) => `<spec mind="${MINDS[s.mind].name}">\n${s.text.slice(0, 2000)}\n</spec>`);
 }
 
-function claude(base: string, key: string, payload: unknown) {
+function claude(base: string, key: string, payload: unknown, timeoutMs = 27000) {
   return fetch(`${base}/v1/messages`, {
-    method: "POST",
+    method: "POST", signal: AbortSignal.timeout(timeoutMs),
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify(payload),
   }).catch(() => new Response(null, { status: 599 }));

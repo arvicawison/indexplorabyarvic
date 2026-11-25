@@ -56,9 +56,22 @@ Optional: `FUN_CLAUDE_MODEL` (default `claude-sonnet-5-5`), `FUN_CLAUDE_REQUIRE_
   (Netlify Blobs store `fwc-showcase`) after an all-ages safety check; anyone can open it at
   `/fun-with-claude/view/#s=<id>` or remix it. The sharing device keeps a private owner key to remove it.
 
+## Parallel builders ("RAM split") and the feature ledger
+After the minds and the huddle, the **Architect** splits the app into up to 20 modules and writes a
+shared shell: design tokens, layout with one slot per module, and a tiny `window.App` event/state
+runtime. Up to **20 builders** then write their modules at the same time (one request each, retried
+once if busy), and the page assembles them instantly. Each module's script runs isolated, so one
+broken module can't stop the others, and its error names the module for the quality check. Choose
+20/12/8/4 builders, or "1 builder (in parts)". If the Architect fails, it falls back to one builder.
+Builders use `FUN_CLAUDE_BUILDER_MODEL` (default `claude-haiku-5-5`, fast and light on credits);
+the Architect, minds and reviewer use `FUN_CLAUDE_MODEL`.
+Every chat keeps a **feature ledger** of everything asked for so far; minds, huddle, Architect,
+builders and reviewer all receive it, so new versions keep every earlier feature and connect them.
+
 ## Request time limit
-Netlify Free cuts every request at about 30 seconds. Builds therefore stream in parts of about 22s
-(`FUN_CLAUDE_PART_MS`) and the page continues automatically (up to 6 parts). Evolution Dash streams
+Netlify Free cuts every request at about 30 seconds. Every Claude call is therefore sized to finish
+in time: single-builder parts are capped at 2,600 tokens (`FUN_CLAUDE_PART_TOKENS`) with a hard 24s
+timer (`FUN_CLAUDE_PART_MS`), and the page continues automatically (up to 6 parts). Evolution Dash streams
 internally and stops by about 25s (`FUN_CLAUDE_DASH_MS`), closing any unfinished artwork so it still
 displays. On a paid plan with a longer limit you can raise both values.
 
