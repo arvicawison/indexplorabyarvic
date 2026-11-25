@@ -4,6 +4,13 @@ A separate section of indexplora.com for Claude experiments. Nothing here change
 the existing app code; the page styles are copies kept in `fun-with-claude/assets/`.
 
 - `/fun-with-claude/`: section home.
+- `/fun-with-claude/evolution-dash/`: Evolution Dash. Visitors press buttons (form, element, gift,
+  art style, companion) and Claude creates an original, all-ages god, goddess or deity of creativity:
+  SVG artwork, name, title and a mini-epic. "Evolve" adds a new influence and creates the next
+  stage (up to 9), with a stage timeline, PNG/SVG downloads and a saved "pantheon" gallery.
+  Only listed button values are accepted; the SVG is sanitised on the server and shown as an
+  <img>, so it can't run code. Back end: `netlify/functions/fun-with-claude-dash.mts` at
+  `POST /api/fun-with-claude/dash` (30 calls/minute per visitor).
 - `/fun-with-claude/eight-minds/`: 8-Mind AI Generator. Eight Claude minds (Strategist,
   Scientist, Skeptic, Creator, Earner, Storyteller, Designer, Futurist) each generate a take on
   the visitor's idea in the chosen format; a Unified Mind merges them into one result.
@@ -22,7 +29,8 @@ the existing app code; the page styles are copies kept in `fun-with-claude/asset
   **foresight** warnings about knock-on effects on users, others, animals and the environment.
   Below 85 or with runtime errors, one automatic improvement pass builds the next version and
   re-checks it. Warnings go to the chat and the Activity log.
-  **Live suggestions** (💡) under the prompt bar as you type (uses `FUN_CLAUDE_SUGGEST_MODEL`,
+  **Live suggestions** (💡) fade in and out under the prompt bar, with a soft pulse while thinking;
+  they learn from the user's recent prompts and picks (kept only in their browser, resettable) (uses `FUN_CLAUDE_SUGGEST_MODEL`,
   default `claude-haiku-5-5`). **Export backup / Import** saves chats, versions and the activity log
   as a JSON file (e.g. to iCloud Drive) and restores it in any browser.
   Back end: `netlify/functions/fun-with-claude-apps.mts` at `POST /api/fun-with-claude/apps`.

@@ -203,16 +203,17 @@ export default async (req: Request, context: any) => {
 
   if (body?.mode === "suggest") {
     const ctx = typeof body?.appSummary === "string" ? body.appSummary.slice(0, 600) : "";
+    const memory = (Array.isArray(body?.memory) ? body.memory : []).filter((m: any) => typeof m === "string" && m.trim()).slice(-8).map((m: string) => m.trim().slice(0, 160));
     const r = await claude(base, key, {
       model: Netlify.env.get("FUN_CLAUDE_SUGGEST_MODEL") || "claude-haiku-5-5", max_tokens: 200, system: SUGGEST,
-      messages: [{ role: "user", content: `${ctx ? "Current app: " + ctx + "\n" : ""}Type: ${KINDS[kind]}\nTyped so far: ${prompt}` }],
+      messages: [{ role: "user", content: `${memory.length ? "This user's recent requests and picks (personalise to their style and interests, but don't repeat them):\n- " + memory.join("\n- ") + "\n" : ""}${ctx ? "Current app: " + ctx + "\n" : ""}Type: ${KINDS[kind]}\nTyped so far: ${prompt}` }],
     });
     if (!r.ok) return upstreamError(r.status);
     const data: any = await r.json();
     const text = (data?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join("");
     const list = parseJson(text, []);
     const suggestions = (Array.isArray(list) ? list : []).filter((x: any) => typeof x === "string" && x.trim()).slice(0, 3).map((x: string) => x.trim().slice(0, 120));
-    log({ who, mode: "suggest", outcome: "ok", n: suggestions.length });
+    log({ who, mode: "suggest", outcome: "ok", n: suggestions.length, memory: memory.length });
     return json({ suggestions, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
   }
 

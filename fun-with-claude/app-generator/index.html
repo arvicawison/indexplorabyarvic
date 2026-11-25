@@ -71,9 +71,20 @@ a{color:var(--blue)}
 .pop .menu[hidden]{display:none}
 .pop .menu label{display:flex;gap:6px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px}
 .pop .menu label:hover{background:#232329}
-#sugs{display:flex;gap:6px;flex-wrap:wrap;min-height:0}
-#sugs button{background:#17131f;border:1px solid #3b2a55;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:#e9d5ff;text-align:left}
-#sugs button:hover{border-color:var(--accent)}
+#sugwrap{display:grid;gap:6px}
+#sugmeta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);min-height:16px;opacity:0;transition:opacity .5s ease}
+#sugwrap.has #sugmeta,#sugwrap.thinking #sugmeta{opacity:1}
+#sugmeta .pulse{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle,#e9d5ff,#a855f7);box-shadow:0 0 0 0 #a855f799}
+#sugwrap.thinking .pulse{animation:evo 1.6s ease-out infinite}
+#sugwrap.has:not(.thinking) .pulse{animation:evo 3.2s ease-out 1}
+@keyframes evo{0%{box-shadow:0 0 0 0 #a855f799;transform:scale(.9)}50%{transform:scale(1.15)}100%{box-shadow:0 0 0 12px #a855f700;transform:scale(1)}}
+#sugmeta button{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:11px;padding:0}
+#sugs{display:flex;gap:6px;flex-wrap:wrap;transition:opacity .45s ease,transform .45s ease}
+#sugs.leaving{opacity:0;transform:translateY(4px)}
+#sugs button{background:#17131f;border:1px solid #3b2a55;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:#e9d5ff;text-align:left;opacity:0;transform:translateY(6px) scale(.98);animation:sugIn .55s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i) * 110ms)}
+#sugs button:hover{border-color:var(--accent);box-shadow:0 0 14px #a855f744}
+@keyframes sugIn{to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){#sugs button{animation:none;opacity:1;transform:none}#sugwrap .pulse{animation:none!important}#sugs,#sugmeta{transition:none}}
 .score{font-weight:800}.sev-high{color:var(--err)}.sev-medium{color:var(--warn)}.sev-low{color:var(--muted)}
 .backup{display:flex;gap:6px;flex-wrap:wrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
@@ -140,7 +151,8 @@ a{color:var(--blue)}
   <form class="composer" id="composer">
     <label for="prompt" class="skip">Describe an app or a change</label>
     <textarea id="prompt" maxlength="3000" placeholder="Describe an app to build…"></textarea>
-    <div id="sugs" aria-live="polite" aria-label="Suggestions"></div>
+    <div id="sugwrap"><div id="sugmeta"><span class="pulse" aria-hidden="true"></span><span id="sugtxt"></span><button type="button" id="memReset" hidden>reset memory</button></div>
+    <div id="sugs" aria-live="polite" aria-label="Suggestions"></div></div>
     <div class="crow">
       <select id="kind" aria-label="App type"><option value="app">Interactive app</option><option value="landing">Landing page</option><option value="dashboard">Dashboard</option><option value="tool">Calculator / tool</option><option value="game">Mini game</option><option value="form">Multi-step form</option><option value="assistant">AI-assistant style UI</option></select>
       <div class="pop"><button type="button" class="ib" id="mindsBtn" aria-expanded="false" aria-haspopup="true">Minds 8/8 ▾</button><div class="menu" id="mindsMenu" hidden></div></div>
@@ -461,31 +473,51 @@ a{color:var(--blue)}
   // ---------- toggles ----------
   const pref = (k, d) => { const v = store.get(k); return v == null ? d : v === "1"; };
   let evolve = pref("fwc.evolve", true), suggestOn = pref("fwc.suggest", true);
-  function syncToggles() { $("evoBtn").setAttribute("aria-pressed", evolve); $("sugBtn").setAttribute("aria-pressed", suggestOn); if (!suggestOn) $("sugs").innerHTML = ""; }
+  function syncToggles() { $("evoBtn").setAttribute("aria-pressed", evolve); $("sugBtn").setAttribute("aria-pressed", suggestOn); $("sugwrap").hidden = !suggestOn; }
   $("evoBtn").onclick = () => { evolve = !evolve; store.set("fwc.evolve", evolve ? "1" : "0"); syncToggles(); toast(evolve ? "Self-improve on: weak builds get one automatic improvement pass" : "Self-improve off", "#a855f7"); };
   $("sugBtn").onclick = () => { suggestOn = !suggestOn; store.set("fwc.suggest", suggestOn ? "1" : "0"); syncToggles(); };
   syncToggles();
 
-  // ---------- live suggestions under the prompt bar ----------
+  // ---------- live suggestions under the prompt bar, evolving with the user's own history ----------
   let sugTimer = 0, sugCtl = null, sugFor = "";
+  const memory = () => { try { const m = JSON.parse(store.get("fwc.memory") || "[]"); return Array.isArray(m) ? m : []; } catch { return []; } };
+  function remember(item) { const m = memory().filter((x) => x !== item); m.push(item.slice(0, 160)); store.set("fwc.memory", JSON.stringify(m.slice(-20))); syncMeta(); }
+  function syncMeta(thinking) {
+    const n = memory().length;
+    $("sugtxt").textContent = thinking ? "Evolving ideas from what you've made…" : n ? `Evolving with you · learned from ${n} idea${n === 1 ? "" : "s"}` : "Suggestions learn from what you build";
+    $("memReset").hidden = !n || !!thinking;
+  }
+  $("memReset").onclick = () => { store.set("fwc.memory", "[]"); syncMeta(); toast("Suggestion memory reset", "#a855f7"); };
+  function hideSugs() {
+    if (!$("sugs").children.length) { $("sugwrap").classList.remove("has", "thinking"); return; }
+    $("sugs").classList.add("leaving"); $("sugwrap").classList.remove("has");
+    setTimeout(() => { if ($("sugs").classList.contains("leaving")) { $("sugs").innerHTML = ""; $("sugs").classList.remove("leaving"); } }, 460);
+  }
+  function showSugs(list) {
+    $("sugs").classList.remove("leaving");
+    $("sugs").innerHTML = list.map((x, i) => `<button type="button" style="--i:${i}" data-sug="${esc(x)}">💡 ${esc(x)}</button>`).join("");
+    $("sugwrap").classList.toggle("has", list.length > 0);
+  }
   $("prompt").addEventListener("input", () => {
-    clearTimeout(sugTimer); sugCtl?.abort();
+    clearTimeout(sugTimer); sugCtl?.abort(); $("sugwrap").classList.remove("thinking");
     const t = $("prompt").value.trim();
-    if (!suggestOn || busy || t.length < 8) { if (t.length < 8) $("sugs").innerHTML = ""; return; }
+    if (!suggestOn || busy || t.length < 8) { hideSugs(); sugFor = ""; return; }
     sugTimer = setTimeout(async () => {
       if (t === sugFor) return; sugFor = t; sugCtl = new AbortController();
+      $("sugwrap").classList.add("thinking"); syncMeta(true);
       try {
         usage.calls++; renderUsage();
         const c = active(), v = c?.versions[c.versions.length - 1];
-        const res = await fetch(API, { method: "POST", headers: headers(), signal: sugCtl.signal, body: JSON.stringify({ mode: "suggest", prompt: t, kind: c?.kind || $("kind").value, appSummary: v ? c.title + " (v" + v.n + "). " + (c.blueprint || "").slice(0, 400) : "" }) });
+        const res = await fetch(API, { method: "POST", headers: headers(), signal: sugCtl.signal, body: JSON.stringify({ mode: "suggest", prompt: t, kind: c?.kind || $("kind").value, memory: memory().slice(-8), appSummary: v ? c.title + " (v" + v.n + "). " + (c.blueprint || "").slice(0, 400) : "" }) });
         if (!res.ok) return;
         const r = await res.json(); usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
         if ($("prompt").value.trim() !== t) return;
-        $("sugs").innerHTML = (r.suggestions || []).map((x) => `<button type="button" data-sug="${esc(x)}">💡 ${esc(x)}</button>`).join("");
-      } catch {}
+        showSugs(r.suggestions || []);
+      } catch {} finally { $("sugwrap").classList.remove("thinking"); syncMeta(); }
     }, 900);
   });
-  $("sugs").addEventListener("click", (e) => { const b = e.target.closest("[data-sug]"); if (!b) return; $("prompt").value = b.dataset.sug; $("sugs").innerHTML = ""; sugFor = b.dataset.sug; $("prompt").focus(); });
+  $("sugs").addEventListener("click", (e) => { const b = e.target.closest("[data-sug]"); if (!b) return; $("prompt").value = b.dataset.sug; remember("picked: " + b.dataset.sug); hideSugs(); sugFor = b.dataset.sug; $("prompt").focus(); });
+  syncMeta();
 
   // ---------- backup (export / import) ----------
   $("expBtn").onclick = () => { download(`fun-with-claude-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "fun-with-claude", version: 1, exported: new Date().toISOString(), chats, activity: LOG, stats }, null, 1), "application/json"); toast("Backup downloaded: save it to iCloud Drive or any folder", "#34d399"); log("info", "Exported a backup of " + chats.length + " chats"); };
@@ -584,7 +616,7 @@ a{color:var(--blue)}
   async function run() {
     if (busy) return;
     const text = $("prompt").value.trim(); if (!text) return;
-    clearTimeout(sugTimer); sugCtl?.abort(); $("sugs").innerHTML = "";
+    clearTimeout(sugTimer); sugCtl?.abort(); hideSugs(); remember(text);
     const kind = $("kind").value, minds = selected();
     let c = active();
     if (!c) c = newChat(text.length > 48 ? text.slice(0, 46) + "…" : text, kind);

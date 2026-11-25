@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Evolution Dash | Fun with Claude | Indexplora</title>
+<meta name="description" content="Press a few buttons and Claude creates your own original, all-ages god or goddess of creativity, with art and a mini-epic. Then evolve them.">
+<link rel="canonical" href="https://indexplora.com/fun-with-claude/evolution-dash/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0b0c;--panel:#141416;--line:#26262a;--ink:#f4f4f5;--muted:#a1a1aa;--soft:#1b1b1f;--accent:#a855f7;--gold:#facc15;--blue:#38bdf8}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 20% -10%,#2a1240 0,transparent 50%),radial-gradient(ellipse at 100% 30%,#0c2a3a 0,transparent 40%),var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+button,input{font:inherit;color:inherit}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;background:var(--panel);padding:6px 10px;border-radius:8px;z-index:9}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;border-bottom:1px solid var(--line);background:#0b0b0cd9;backdrop-filter:blur(10px)}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-weight:700;white-space:nowrap}
+.mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(120deg,#ec4899,#a855f7,#38bdf8);display:grid;place-items:center;font-size:13px}
+.crumb{color:var(--muted);font-size:13px}.sp{flex:1}
+.ib{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;font-weight:600;text-decoration:none;color:var(--ink);white-space:nowrap}
+.ib:hover{border-color:#3f3f46}.ib[disabled]{opacity:.45;cursor:not-allowed}
+.wrap{max-width:1180px;margin:auto;padding:18px 16px 60px}
+.intro h1{margin:6px 0 4px;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.03em}
+.intro p{margin:0 0 16px;color:var(--muted);max-width:680px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+fieldset{border:0;margin:0 0 14px;padding:0}
+legend{font-size:12px;letter-spacing:.08em;font-weight:800;color:var(--muted);margin-bottom:8px}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt span{display:inline-flex;align-items:center;gap:6px;border:1px solid #333;background:#111;border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px;transition:border-color .2s,background .2s,transform .15s}
+.opt span:hover{border-color:#52525b}
+.opt input:checked+span{border-color:var(--c,#a855f7);background:color-mix(in srgb,var(--c,#a855f7) 18%,#111);transform:translateY(-1px)}
+.opt input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}
+.namerow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.namerow input{flex:1;min-width:160px;background:#0a0a0a;border:1px solid #333;border-radius:10px;padding:9px 12px}
+.go{display:flex;gap:8px;margin-top:6px}
+.create{flex:1;border:0;border-radius:12px;padding:12px 16px;font-weight:800;font-size:16px;cursor:pointer;color:#fff;background:linear-gradient(100deg,#ec4899,#a855f7,#38bdf8);box-shadow:0 0 24px #a855f755}
+.create[disabled]{opacity:.55;cursor:wait}
+.stage{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:#0d0d10;border:1px solid var(--line);display:grid;place-items:center}
+.stage img{width:100%;height:100%;object-fit:contain;display:block;animation:reveal .9s cubic-bezier(.2,.8,.2,1)}
+@keyframes reveal{from{opacity:0;transform:scale(.96);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.empty{color:var(--muted);text-align:center;padding:20px}
+.orb{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fdf4ff,#c084fc 35%,#6d28d9 70%,transparent 72%);animation:breathe 2.4s ease-in-out infinite;margin:0 auto 14px;filter:drop-shadow(0 0 24px #a855f7)}
+@keyframes breathe{0%,100%{transform:scale(.92);opacity:.8}50%{transform:scale(1.06);opacity:1}}
+.who{margin-top:12px}
+.who h2{margin:0;font-size:24px;letter-spacing:-.02em}
+.who .title{color:#e9d5ff;font-style:italic}
+.badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;color:#111;background:var(--gold);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+.epic{color:#e4e4e7;margin:10px 0 0}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}.tags span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.evolve{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.evolve h3{margin:0 0 8px;font-size:14px}
+.evolve .opts button{border:1px solid #3b2a55;background:#17131f;color:#e9d5ff;border-radius:999px;padding:6px 11px;cursor:pointer;font-size:13px}
+.evolve .opts button:hover{border-color:var(--accent);box-shadow:0 0 14px #a855f744}
+.timeline{display:flex;gap:8px;margin-top:12px;overflow:auto;padding-bottom:4px}
+.timeline button{flex:none;width:64px;padding:0;border:2px solid transparent;border-radius:10px;background:#0d0d10;cursor:pointer;overflow:hidden}
+.timeline button[aria-current=true]{border-color:var(--gold)}
+.timeline img{width:100%;display:block}.timeline small{display:block;font-size:10px;color:var(--muted);padding:2px 0}
+.gallery{margin-top:22px}.gallery h2{font-size:18px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.gal button{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;cursor:pointer;text-align:left}
+.gal button:hover{border-color:var(--accent)}
+.gal img{width:100%;border-radius:8px;display:block}.gal b{display:block;font-size:13px;margin-top:4px}.gal small{color:var(--muted);font-size:11px}
+.status{color:var(--muted);font-size:13px;min-height:20px;margin-top:8px}.status.err{color:#fca5a5}
+.note{font-size:12px;color:var(--muted);margin-top:10px}
+.toasts{position:fixed;right:14px;bottom:14px;z-index:20;display:grid;gap:8px}
+.toast{background:#18181b;border:1px solid var(--line);border-left:4px solid var(--c,#a855f7);border-radius:10px;padding:9px 12px;animation:pop .25s ease}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}}
+@media(max-width:860px){.grid{grid-template-columns:1fr}.crumb{display:none}.result{order:-1}}
+@media(prefers-reduced-motion:reduce){.stage img,.orb,.toast{animation:none}.opt span{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><a class="brand" href="../"><span class="mark" aria-hidden="true">✦</span>Fun with Claude</a><span class="crumb">/ Evolution Dash</span><span class="sp"></span><a class="ib" href="../app-generator/">App Generator</a></header>
+<main id="main" class="wrap">
+<section class="intro"><h1>Evolution Dash ✨</h1><p>Press a few buttons and Claude creates your own original god, goddess or deity of creativity, with artwork and a mini-epic. Then evolve them, stage by stage. Their powers only create, heal and delight.</p></section>
+<div class="grid">
+<form class="card" id="picker" aria-label="Choose your powers">
+  <div id="groups"></div>
+  <fieldset><legend>NAME INSPIRATION (OPTIONAL)</legend><div class="namerow"><input id="nameHint" maxlength="30" placeholder="e.g. a sound or word you love" autocomplete="off"></div></fieldset>
+  <div class="go"><button class="create" id="createBtn" type="submit">Create ✨</button><button type="button" class="ib" id="surprise" title="Random choices">🎲 Surprise me</button></div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <p class="note">Every creation is original and all-ages: no real people, real religions' figures or existing characters, and no harm to anyone or anything.</p>
+</form>
+<section class="card result" aria-label="Your creation">
+  <div class="stage" id="stage"><div class="empty"><div class="orb" aria-hidden="true"></div>Your creation will appear here.</div></div>
+  <div id="who"></div>
+</section>
+</div>
+<section class="gallery" id="galWrap" hidden><h2>Your pantheon</h2><div class="gal" id="gal"></div></section>
+</main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script>
+(() => {
+  const API = "/api/fun-with-claude/dash";
+  const SESSION_KEY = "sb-zncmwdqqdgselvrmghwc-auth-token";
+  const GROUPS = [
+    { id: "form", label: "FORM", color: "#f0abfc", options: [["Goddess", "🌸"], ["God", "🌿"], ["Deity", "✨"]] },
+    { id: "element", label: "ELEMENT", color: "#38bdf8", options: [["Sun", "☀️"], ["Moon", "🌙"], ["Ocean", "🌊"], ["Forest", "🌳"], ["Storm", "⛈️"], ["Stars", "⭐"], ["Crystal", "💎"], ["Flame", "🔥"], ["Dawn", "🌅"], ["Snow", "❄️"]] },
+    { id: "gift", label: "GIFT", color: "#34d399", options: [["Healing", "💚"], ["Wisdom", "📜"], ["Kindness", "🤲"], ["Music", "🎶"], ["Craft", "🧵"], ["Courage", "🦁"], ["Harmony", "☯️"], ["Growth", "🌱"], ["Laughter", "😄"], ["Dreams", "💭"]] },
+    { id: "style", label: "ART STYLE", color: "#facc15", options: [["Art Nouveau", "🖼️"], ["Stained glass", "🪟"], ["Papercraft", "✂️"], ["Watercolour", "🎨"], ["Pixel art", "👾"], ["Origami", "🕊️"], ["Mosaic", "🧩"], ["Neon line art", "💡"], ["Embroidery", "🪡"], ["Woodcut", "🪵"]] },
+    { id: "companion", label: "COMPANION", color: "#fb923c", options: [["Owl", "🦉"], ["Fox", "🦊"], ["Whale", "🐋"], ["Bee", "🐝"], ["Deer", "🦌"], ["Dragonfly", "🪰"], ["Tortoise", "🐢"], ["Phoenix", "🐦‍🔥"], ["Hummingbird", "🐦"], ["Octopus", "🐙"]] },
+  ];
+  const EMOJI = Object.fromEntries(GROUPS.flatMap((g) => g.options.map(([v, e]) => [v, e])));
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } } };
+  const svgUrl = (svg) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  function toast(m, c) { const t = document.createElement("div"); t.className = "toast"; t.style.setProperty("--c", c || "#a855f7"); t.textContent = m; $("toasts").append(t); setTimeout(() => t.remove(), 3800); }
+  function token() { try { const raw = JSON.parse(store.get(SESSION_KEY) || "null"); const s = raw?.currentSession ?? raw; if (s?.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) return s.access_token; } catch {} return null; }
+
+  // ---------- buttons ----------
+  $("groups").innerHTML = GROUPS.map((g) => `<fieldset><legend>${g.label}</legend><div class="opts">${g.options.map(([v, e], i) => `<label class="opt" style="--c:${g.color}"><input type="radio" name="${g.id}" value="${esc(v)}" ${g.id === "form" && i === 2 ? "checked" : ""}><span>${e} ${esc(v)}</span></label>`).join("")}</div></fieldset>`).join("");
+  const val = (g) => document.querySelector(`input[name=${g}]:checked`)?.value || null;
+  $("surprise").onclick = () => { for (const g of GROUPS) { const ins = document.querySelectorAll(`input[name=${g.id}]`); ins[Math.floor(Math.random() * ins.length)].checked = true; } toast("Fate has chosen 🎲"); };
+
+  // ---------- state ----------
+  let pantheon = []; try { pantheon = JSON.parse(store.get("fwc.dash") || "[]"); } catch {} if (!Array.isArray(pantheon)) pantheon = [];
+  let current = null, shown = 0, busy = false;
+  function save() { pantheon = pantheon.slice(0, 24); while (!store.set("fwc.dash", JSON.stringify(pantheon)) && pantheon.length > 1) pantheon.pop(); }
+
+  async function call(payload) {
+    const t = token();
+    const res = await fetch(API, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(payload) });
+    let d = {}; try { d = await res.json(); } catch {}
+    if (!res.ok) throw new Error(d.message || (res.status === 429 ? "Lots of creating going on: wait a moment and try again." : res.status === 404 ? "Evolution Dash isn't deployed on this site yet." : "Something went wrong (" + res.status + ")."));
+    return d;
+  }
+  function loading(msg) { $("stage").innerHTML = `<div class="empty"><div class="orb" aria-hidden="true"></div>${esc(msg)}</div>`; }
+  function setBusy(b, msg) { busy = b; $("createBtn").disabled = b; document.querySelectorAll(".evolve button").forEach((x) => (x.disabled = b)); $("status").className = "status"; $("status").textContent = msg || ""; }
+
+  $("picker").addEventListener("submit", async (e) => {
+    e.preventDefault(); if (busy) return;
+    const choices = { form: val("form"), element: val("element"), gift: val("gift"), style: val("style"), companion: val("companion") };
+    const missing = GROUPS.filter((g) => !choices[g.id]).map((g) => g.label.toLowerCase());
+    if (missing.length) { $("status").className = "status err"; $("status").textContent = "First choose: " + missing.join(", ") + " (or tap Surprise me)."; return; }
+    setBusy(true, "Claude is shaping your creation… (about 20 to 40 seconds)"); loading("Gathering starlight…");
+    try {
+      const r = await call(Object.assign({ mode: "create", nameHint: $("nameHint").value }, choices));
+      current = { id: Math.random().toString(36).slice(2, 10), created: Date.now(), stages: [r] };
+      pantheon.unshift(current); save(); shown = 0; render(); renderGallery();
+      setBusy(false, ""); toast(`${r.name} has arrived ✨`, "#34d399");
+    } catch (err) { setBusy(false); $("status").className = "status err"; $("status").textContent = err.message; if (current) render(); else loading("Your creation will appear here."); }
+  });
+
+  async function evolve(group, value) {
+    if (busy || !current) return;
+    const prev = current.stages[current.stages.length - 1];
+    setBusy(true, `Evolving ${prev.name} with ${value}…`); loading(`${prev.name} is evolving…`);
+    try {
+      const r = await call(Object.assign({ mode: "evolve", evolveGroup: group, evolveValue: value, previous: { name: prev.name, title: prev.title, epic: prev.epic, stage: prev.stage } }, prev.choices));
+      current.stages.push(r); current.created = Date.now(); shown = current.stages.length - 1;
+      pantheon = [current, ...pantheon.filter((p) => p !== current)]; save(); render(); renderGallery();
+      setBusy(false, ""); toast(`${r.name} reached stage ${r.stage} 🌟`, "#facc15");
+    } catch (err) { setBusy(false); $("status").className = "status err"; $("status").textContent = err.message; render(); }
+  }
+
+  function evolveOptions(st) {
+    // Four fresh influences the character doesn't have yet, from different groups.
+    const out = [];
+    for (const g of ["element", "gift", "companion", "style"]) {
+      const opts = GROUPS.find((x) => x.id === g).options.map(([v]) => v).filter((v) => v !== st.choices?.[g]);
+      out.push([g, opts[Math.floor(Math.random() * opts.length)]]);
+    }
+    return out;
+  }
+  function render() {
+    if (!current) return;
+    const st = current.stages[shown];
+    $("stage").innerHTML = `<img alt="${esc(st.name + ", " + st.title)}" src="${svgUrl(st.svg)}">`;
+    const ch = st.choices || {};
+    const latest = shown === current.stages.length - 1;
+    $("who").innerHTML = `<div class="who"><h2>${esc(st.name)}<span class="badge">STAGE ${st.stage}</span></h2><div class="title">${esc(st.title)}</div>
+      <p class="epic">${esc(st.epic)}</p>
+      <div class="tags">${["form", "element", "gift", "style", "companion"].filter((k) => ch[k]).map((k) => `<span>${EMOJI[ch[k]] || ""} ${esc(ch[k])}</span>`).join("")}</div>
+      <div class="row"><button type="button" class="ib" id="dlPng">Download PNG</button><button type="button" class="ib" id="dlSvg">Download SVG</button><button type="button" class="ib" id="cpEpic">Copy epic</button></div>
+      ${latest && st.stage < 9 ? `<div class="evolve"><h3>Evolve ${esc(st.name)} with…</h3><div class="opts">${evolveOptions(st).map(([g, v]) => `<button type="button" data-g="${g}" data-v="${esc(v)}">${EMOJI[v] || "✨"} ${esc(v)}</button>`).join("")}</div></div>` : ""}
+      ${current.stages.length > 1 ? `<div class="timeline" aria-label="Evolution stages">${current.stages.map((s, i) => `<button type="button" data-i="${i}" aria-current="${i === shown}" aria-label="Stage ${s.stage}"><img alt="" src="${svgUrl(s.svg)}"><small>Stage ${s.stage}</small></button>`).join("")}</div>` : ""}</div>`;
+    $("dlSvg").onclick = () => dl(new Blob([st.svg], { type: "image/svg+xml" }), slug(st.name) + "-stage-" + st.stage + ".svg");
+    $("dlPng").onclick = () => png(st);
+    $("cpEpic").onclick = () => navigator.clipboard?.writeText(`${st.name}, ${st.title}\n\n${st.epic}`).then(() => toast("Epic copied", "#34d399"));
+    $("who").querySelectorAll(".evolve button").forEach((b) => (b.onclick = () => evolve(b.dataset.g, b.dataset.v)));
+    $("who").querySelectorAll(".timeline button").forEach((b) => (b.onclick = () => { shown = +b.dataset.i; render(); }));
+  }
+  function renderGallery() {
+    $("galWrap").hidden = !pantheon.length;
+    $("gal").innerHTML = pantheon.map((p, i) => { const s = p.stages[p.stages.length - 1]; return `<button type="button" data-p="${i}"><img alt="" src="${svgUrl(s.svg)}"><b>${esc(s.name)}</b><small>Stage ${s.stage} · ${esc(s.title)}</small></button>`; }).join("");
+    $("gal").querySelectorAll("button").forEach((b) => (b.onclick = () => { if (busy) return; current = pantheon[+b.dataset.p]; shown = current.stages.length - 1; render(); window.scrollTo({ top: 0, behavior: "smooth" }); }));
+  }
+  const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "creation";
+  function dl(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  function png(st) {
+    const img = new Image();
+    img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 1024; const x = c.getContext("2d"); x.fillStyle = "#0d0d10"; x.fillRect(0, 0, 1024, 1024); x.drawImage(img, 0, 0, 1024, 1024); c.toBlob((b) => b ? dl(b, slug(st.name) + "-stage-" + st.stage + ".png") : toast("Couldn't make a PNG; try SVG", "#f59e0b"), "image/png"); };
+    img.onerror = () => toast("Couldn't make a PNG; try SVG", "#f59e0b");
+    img.src = svgUrl(st.svg);
+  }
+  renderGallery();
+  if (pantheon.length) { current = pantheon[0]; shown = current.stages.length - 1; render(); }
+})();
+</script>
+</body>
+</html>
