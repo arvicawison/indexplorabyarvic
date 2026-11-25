@@ -7,11 +7,15 @@ the existing app code; the page styles are copies kept in `fun-with-claude/asset
 - `/fun-with-claude/eight-minds/`: 8-Mind AI Generator. Eight Claude minds (Strategist,
   Scientist, Skeptic, Creator, Earner, Storyteller, Designer, Futurist) each generate a take on
   the visitor's idea in the chosen format; a Unified Mind merges them into one result.
-- `/fun-with-claude/app-generator/`: AI App & UI Generator. The eight minds write short specs, the
-  Conductor streams one self-contained HTML app, shown in a locked preview (sandboxed iframe +
-  no-network Content-Security-Policy, so generated code can't reach the network, cookies or the
-  visitor's sign-in). Pull-up smart log with summaries and export, pop-up alerts, Stop, refine,
-  copy/download, full screen, and a local history of the last 8 builds.
+- `/fun-with-claude/app-generator/`: AI App & UI Generator, laid out like Claude: chats on the
+  left, each run's progress as chat messages in the middle, the app on the right with versions.
+  Workflow: the eight minds plan in parallel → a **Huddle** merges their specs into one shared
+  blueprint (resolving disagreements) → the **Conductor** streams the app; large apps continue
+  automatically in up to 4 parts. Refining reuses the blueprint and the previous version.
+  **Deploy** makes a shareable link to `/fun-with-claude/view/` with the app packed inside the
+  link (nothing stored on a server); viewers can download or remix it. Previews and shared apps
+  run in a sandboxed iframe with a no-network Content-Security-Policy. Activity panel with smart
+  summary and export; usage (calls, tokens) is shown openly. Chats are saved in the browser.
   Back end: `netlify/functions/fun-with-claude-apps.mts` at `POST /api/fun-with-claude/apps`.
 - `netlify/functions/fun-with-claude.mts`: the back end at `POST /api/fun-with-claude`
   (no npm packages). Holds the persona prompts; the browser can only pick minds by id.
@@ -34,7 +38,8 @@ Optional: `FUN_CLAUDE_MODEL` (default `claude-sonnet-5-5`), `FUN_CLAUDE_REQUIRE_
   unsupported medical/legal/financial claims.
 
 ## Cost and limits
-An App Generator run with all minds = 8 short calls + 1 build call (up to 6,000 output tokens),
-limited to 45 calls per visitor IP per minute.
+An App Generator run with all minds = 8 short planning calls + 1 huddle + 1 to 4 build parts
+(up to 8,000 output tokens each). Limit: 120 calls per visitor IP per minute, to stop runaway
+scripts rather than normal use.
 A generation with all eight minds = 9 Claude calls. Each visitor IP is limited to 54 calls a
 minute (about 6 generations). Watch usage in Netlify (or your Anthropic console if using your key).

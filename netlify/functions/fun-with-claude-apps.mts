@@ -2,6 +2,8 @@
 // POST /api/fun-with-claude/apps
 //   mode "mind"  -> one of eight minds writes a short spec for the requested UI/app (JSON reply)
 //   mode "build" -> the Conductor streams one self-contained HTML app (plain-text stream)
+//   mode "huddle" -> merges the minds' specs into one shared blueprint (resolves conflicts)
+//   mode "continue" -> continues a build that was cut off (large apps are built in parts)
 //
 // Owner controls (Netlify > Site configuration > Environment variables, scope: Functions):
 //   FUN_CLAUDE_PAUSED=true          instantly switches the generator off (override / kill switch)
@@ -54,8 +56,18 @@ const KINDS: Record<string, string> = {
   assistant: "an AI-assistant style interface that simulates responses locally",
 };
 
+const HUDDLE = `You run the Huddle in "Fun with Claude: AI App & UI Generator". Several minds each wrote a spec
+for the user's app. Merge them into ONE shared blueprint the Conductor will build from, so the ideas
+reinforce each other instead of competing. Max 260 words, Markdown, with these headings:
+**Concept** (name + one line), **Core flow**, **Features** (prioritised list), **Look & feel**,
+**Copy**, **Safeguards**, **Resolved** (where minds disagreed and what you chose, one line each).
+No code.
+
+${SAFETY}`;
+
 const CONDUCTOR = `You are the Conductor of "Fun with Claude: AI App & UI Generator". Eight minds wrote specs for
-the user's app. Combine the best of them and build it.
+the user's app, and a Huddle merged them into a shared blueprint. Follow the blueprint, use the
+specs for detail, and build it.
 
 Output ONLY one complete HTML document, starting with <!doctype html> and ending with </html>.
 No Markdown fences, no explanation before or after.
@@ -64,7 +76,8 @@ No Markdown fences, no explanation before or after.
   Use emoji, CSS shapes, inline SVG or data: URIs for visuals.
 - It must work: real interactivity in plain JavaScript, no console errors, responsive from
   360px phones to desktop, accessible (labels, focus styles, sufficient contrast).
-- Keep it under about 3,500 tokens: polished but compact.
+- Be ambitious: build a complete, polished, feature-rich app. Large apps are fine; if you are cut off
+  you will be asked to continue.
 - Put a short HTML comment at the very top summarising what you built and any safety changes.
 
 ${SAFETY}`;
@@ -106,28 +119,44 @@ export default async (req: Request, context: any) => {
   if (body?.mode === "mind") {
     const mind = MINDS[String(body?.mind)];
     if (!mind) return json({ error: "unknown_mind" }, 400);
-    const prev = typeof body?.previousSummary === "string" ? body.previousSummary.slice(0, 1500) : "";
+    const prev = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
     const r = await claude(base, key, {
       model, max_tokens: 400, system: `${MIND_SHARED}\n\n${mind.prompt}`,
-      messages: [{ role: "user", content: prev ? `${request}\n\n(This refines an earlier version: ${prev})` : request }],
+      messages: [{ role: "user", content: prev ? `${request}\n\nThis refines an existing app. Build on its current blueprint rather than starting over:\n\n${prev}` : request }],
     });
     if (!r.ok) { log({ who, mode: "mind", mind: body.mind, kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
     const data: any = await r.json();
     const text = (data?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join("").trim();
     log({ who, mode: "mind", mind: body.mind, kind, outcome: "ok", in: data?.usage?.input_tokens, out: data?.usage?.output_tokens });
-    return json({ mind: body.mind, text });
+    return json({ mind: body.mind, text, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
   }
 
-  if (body?.mode === "build") {
-    const specs = (Array.isArray(body?.specs) ? body.specs : [])
-      .filter((s: any) => MINDS[s?.mind] && typeof s?.text === "string" && s.text.trim())
-      .slice(0, 8)
-      .map((s: any) => `<spec mind="${MINDS[s.mind].name}">\n${s.text.slice(0, 2000)}\n</spec>`);
-    const previous = typeof body?.previousHtml === "string" ? body.previousHtml.slice(0, 40000) : "";
-    let user = `${request}\n\n${specs.length ? "The minds' specs:\n\n" + specs.join("\n\n") : "(No specs: use your own judgement.)"}`;
-    if (previous) user += `\n\nThis is a refinement. Here is the current version; keep what works and apply the request:\n\n${previous}`;
+  if (body?.mode === "huddle") {
+    const specs = cleanSpecs(body?.specs);
+    if (!specs.length) return json({ error: "specs_required" }, 400);
+    const prev = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
+    const r = await claude(base, key, {
+      model, max_tokens: 700, system: HUDDLE,
+      messages: [{ role: "user", content: `${request}\n\n${prev ? "Previous blueprint (update it, don't discard what still works):\n" + prev + "\n\n" : ""}The minds' specs:\n\n${specs.join("\n\n")}` }],
+    });
+    if (!r.ok) { log({ who, mode: "huddle", kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
+    const data: any = await r.json();
+    const text = (data?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join("").trim();
+    log({ who, mode: "huddle", kind, specs: specs.length, outcome: "ok", in: data?.usage?.input_tokens, out: data?.usage?.output_tokens });
+    return json({ blueprint: text, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
+  }
 
-    const r = await claude(base, key, { model, max_tokens: 6000, stream: true, system: CONDUCTOR, messages: [{ role: "user", content: user }] });
+  if (body?.mode === "build" || body?.mode === "continue") {
+    const partial = body?.mode === "continue" && typeof body?.partialHtml === "string" ? body.partialHtml.slice(-60000) : "";
+    if (body?.mode === "continue" && !partial) return json({ error: "partial_required" }, 400);
+    const specs = cleanSpecs(body?.specs);
+    const blueprint = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
+    const previous = typeof body?.previousHtml === "string" ? body.previousHtml.slice(0, 40000) : "";
+    let user = `${request}\n\n${blueprint ? "Shared blueprint (follow this):\n" + blueprint + "\n\n" : ""}${specs.length ? "The minds' specs:\n\n" + specs.join("\n\n") : "(No specs: use your own judgement.)"}`;
+    if (previous) user += `\n\nThis is a refinement. Here is the current version; keep what works and apply the request:\n\n${previous}`;
+    if (partial) user += `\n\nYou already started writing the app but were cut off. Here is everything written so far:\n\n${partial}\n\nContinue EXACTLY from the last character above. Output only the remaining code, without repeating anything already written and without any explanation, and finish with </html>.`;
+
+    const r = await claude(base, key, { model, max_tokens: 8000, stream: true, system: CONDUCTOR, messages: [{ role: "user", content: user }] });
     if (!r.ok || !r.body) { log({ who, mode: "build", kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
 
     // Turn Anthropic's event stream into a plain text stream of the HTML as it is written.
@@ -138,7 +167,9 @@ export default async (req: Request, context: any) => {
       async pull(ctrl) {
         while (true) {
           const { value, done } = await upstream.read();
-          if (done) { log({ who, mode: "build", kind, specs: specs.length, refine: !!previous, outcome: "ok", stop, in: inTokens, out: outTokens }); ctrl.close(); return; }
+          if (done) { log({ who, mode: body.mode, kind, specs: specs.length, refine: !!previous, outcome: "ok", stop, in: inTokens, out: outTokens }); ctrl.close(); return; }
+          // Stay inside Netlify's 60s limit: stop cleanly so the page can ask for the next part.
+          if (Date.now() - started > 52000) { upstream.cancel().catch(() => {}); log({ who, mode: body.mode, kind, outcome: "part_done", in: inTokens, out: outTokens }); ctrl.close(); return; }
           buf += dec.decode(value, { stream: true });
           let i, emitted = false;
           while ((i = buf.indexOf("\n\n")) >= 0) {
@@ -161,6 +192,13 @@ export default async (req: Request, context: any) => {
 
   return json({ error: "unknown_mode" }, 400);
 };
+
+function cleanSpecs(list: unknown): string[] {
+  return (Array.isArray(list) ? list : [])
+    .filter((s: any) => MINDS[s?.mind] && typeof s?.text === "string" && s.text.trim())
+    .slice(0, 8)
+    .map((s: any) => `<spec mind="${MINDS[s.mind].name}">\n${s.text.slice(0, 2000)}\n</spec>`);
+}
 
 function claude(base: string, key: string, payload: unknown) {
   return fetch(`${base}/v1/messages`, {
@@ -196,9 +234,9 @@ function json(payload: unknown, status = 200) {
   return Response.json(payload, { status });
 }
 
-// 8 mind calls + 1 build per generation; ~5 generations per minute per visitor.
+// Generous per-visitor limit: 120 calls a minute (about 10 full builds) to stop runaway scripts only.
 export const config = {
   path: "/api/fun-with-claude/apps",
   method: "POST",
-  rateLimit: { action: "rate_limit", aggregateBy: ["ip", "domain"], windowSize: 60, windowLimit: 45 },
+  rateLimit: { action: "rate_limit", aggregateBy: ["ip", "domain"], windowSize: 60, windowLimit: 120 },
 };
