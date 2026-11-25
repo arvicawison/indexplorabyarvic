@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8-Mind AI Generator | Fun with Claude | Indexplora</title>
+<meta name="description" content="Type an idea and eight Claude minds generate their own take, then a Unified Mind combines them into one result.">
+<link rel="canonical" href="https://indexplora.com/fun-with-claude/eight-minds/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/site.css">
+<style>
+.mm{max-width:1080px;margin:auto;padding:10px 22px 60px}
+.mm .hero{padding:48px 0 24px;text-align:left}.mm .hero h1{text-transform:none;font-size:clamp(40px,8vw,72px);line-height:1.02;letter-spacing:-.05em;margin:14px 0}.mm .hero p{max-width:660px;color:var(--muted);font-size:18px;margin-left:0!important}
+.ask{display:grid;gap:12px}
+.ask textarea{width:100%;min-height:110px;resize:vertical;background:#0a0a0a;border:1px solid #333;border-radius:14px;padding:14px;color:var(--ink);font:inherit}
+.ask select{background:#0a0a0a;border:1px solid #333;border-radius:12px;padding:10px 12px;color:var(--ink);font:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative;display:inline-flex;align-items:center;gap:7px;border:1px solid #333;background:#111;color:var(--muted);border-radius:999px;padding:7px 13px;font:600 14px/1 inherit;cursor:pointer;user-select:none}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.chip:has(input:checked){color:var(--ink);border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,#111)}
+.chip:has(input:focus-visible){outline:2px solid var(--blue);outline-offset:2px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.mm .button{border:0;cursor:pointer;font:inherit}
+.mm .button[disabled]{opacity:.55;cursor:wait}
+.status{color:var(--muted);font-size:13px}.status.err{color:#fca5a5}
+.thread{display:grid;gap:26px;margin-top:30px}
+.turn h3{font-size:18px;margin:0 0 12px;color:#e5e5e5;overflow-wrap:anywhere}
+.unified{border:1px solid transparent;background:linear-gradient(#121212,#121212) padding-box,var(--neon) border-box;border-radius:18px;padding:18px 20px;margin-bottom:14px}
+.unified .tag{font-size:12px;letter-spacing:.12em;font-weight:800;background:var(--neon);-webkit-background-clip:text;background-clip:text;color:transparent}
+.minds{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.mind{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:14px;padding:14px 16px}
+.mind .tag{font-size:12px;letter-spacing:.1em;font-weight:800;color:var(--c)}
+.body{color:#e5e5e5;font-size:15px;overflow-wrap:anywhere}.body p{margin:.55em 0}.body ul,.body ol{padding-left:1.2em;margin:.5em 0}.body h4{margin:.8em 0 .3em;font-size:15px}.body code{background:#1f1f1f;padding:1px 5px;border-radius:5px}
+.wait{color:var(--muted);font-size:14px;display:flex;gap:8px;align-items:center;margin-top:8px}
+.wait::before{content:"";width:12px;height:12px;border-radius:50%;border:2px solid #444;border-top-color:var(--c,#a855f7);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.failed{color:#fca5a5;font-size:14px;margin-top:8px}
+.link{background:none;border:0;color:var(--blue);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+.copy{float:right;background:#1c1c1c;border:1px solid #333;color:var(--muted);border-radius:8px;font:600 12px/1 inherit;padding:6px 9px;cursor:pointer}
+@media(max-width:760px){.mm .hero{padding-top:32px}.minds{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.wait::before{animation:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header"><div class="wrap">
+<a class="logo" href="/" aria-label="Arvic Awison, Indexplora home"><span class="logo-mark" aria-hidden="true">✦</span><span class="logo-text"><b>Arvic Awison</b><small>Designer of Socio-Logics for Eternal Invincibility for All</small></span></a>
+<nav class="nav" aria-label="Primary"><a href="/">Home</a><a href="../">Fun with Claude</a><a href="./" aria-current="page" class="cta">8-Mind Generator</a></nav>
+</div></header>
+
+<main id="main" class="mm">
+<div class="brand">FUN WITH CLAUDE</div>
+<section class="hero"><span class="pill">8-MIND AI GENERATOR · POWERED BY CLAUDE</span>
+<h1>One idea.<br><span class="gradient">Eight minds.</span></h1>
+<p>Type an idea and choose what to make. Eight Claude minds each generate their own take, then the Unified Mind combines the best of them into one result.</p></section>
+
+<form class="panel ask" id="ask">
+<label for="q" style="font-weight:700">Your idea</label>
+<textarea id="q" maxlength="3000" placeholder="Example: A weekend community event that helps people live healthier and longer" required></textarea>
+<div class="row" style="justify-content:flex-start"><label for="fmt" class="status">Make</label>
+<select id="fmt"><option value="answer">An answer</option><option value="ideas">Fresh ideas</option><option value="plan">A plan</option><option value="story">A short story</option><option value="post">A social post</option><option value="product">A product concept</option></select></div>
+<fieldset style="border:0;padding:0;margin:0"><legend class="status" style="margin-bottom:8px">Minds on the panel</legend><div class="chips" id="chips"></div></fieldset>
+<div class="row"><span class="status" id="status" role="status" aria-live="polite"></span>
+<div style="display:flex;gap:12px;align-items:center"><button type="button" class="link" id="reset" hidden>Start over</button><button class="button" id="go" type="submit">Generate</button></div></div>
+</form>
+
+<section class="thread" id="thread" aria-live="polite"></section>
+</main>
+
+<script>
+(() => {
+  const ENDPOINT = "/api/fun-with-claude";
+  const SESSION_KEY = "sb-zncmwdqqdgselvrmghwc-auth-token"; // the main site's sign-in, if present
+  const MINDS = [
+    { id: "strategist",  name: "Strategist",  color: "#38bdf8" },
+    { id: "scientist",   name: "Scientist",   color: "#34d399" },
+    { id: "skeptic",     name: "Skeptic",     color: "#f97316" },
+    { id: "creator",     name: "Creator",     color: "#ec4899" },
+    { id: "earner",      name: "Earner",      color: "#facc15" },
+    { id: "storyteller", name: "Storyteller", color: "#a78bfa" },
+    { id: "designer",    name: "Designer",    color: "#2dd4bf" },
+    { id: "futurist",    name: "Futurist",    color: "#f43f5e" },
+  ];
+  const $ = (id) => document.getElementById(id);
+  const history = [];
+  let busy = false;
+
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  let saved = null; try { saved = JSON.parse(store.get("fwc.minds") || "null"); } catch {}
+  for (const m of MINDS) {
+    const lab = document.createElement("label");
+    lab.className = "chip"; lab.style.setProperty("--c", m.color);
+    lab.innerHTML = `<input type="checkbox" value="${m.id}"><span class="dot"></span>${m.name}`;
+    lab.querySelector("input").checked = !Array.isArray(saved) || saved.includes(m.id);
+    $("chips").append(lab);
+  }
+  const selected = () => [...$("chips").querySelectorAll("input:checked")].map((i) => i.value);
+  $("chips").addEventListener("change", () => store.set("fwc.minds", JSON.stringify(selected())));
+
+  function token() {
+    try {
+      const raw = JSON.parse(store.get(SESSION_KEY) || "null");
+      const s = raw?.currentSession ?? raw;
+      if (s?.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) return s.access_token;
+    } catch {}
+    return null;
+  }
+  function setStatus(msg, err) { $("status").textContent = msg || ""; $("status").className = "status" + (err ? " err" : ""); }
+  function signInHint() { $("status").className = "status"; $("status").innerHTML = 'Please <a href="/sign-in">sign in to Indexplora</a> to use the generator.'; }
+
+  async function call(payload) {
+    const t = token();
+    const res = await fetch(ENDPOINT, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(payload) });
+    let data = {}; try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      const e = new Error(data.message || (res.status === 429 ? "Too many requests. Wait a minute and try again." : res.status === 404 ? "The generator isn't deployed on this site yet." : "Something went wrong (" + res.status + ")."));
+      e.code = data.error || res.status; throw e;
+    }
+    return data;
+  }
+
+  function md(src) {
+    const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    let out = "", list = null;
+    const close = () => { if (list) { out += `</${list}>`; list = null; } };
+    for (const line of src.split("\n")) {
+      let m;
+      if ((m = line.match(/^\s*[-*•]\s+(.*)/))) { if (list !== "ul") { close(); out += "<ul>"; list = "ul"; } out += `<li>${inline(m[1])}</li>`; }
+      else if ((m = line.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== "ol") { close(); out += "<ol>"; list = "ol"; } out += `<li>${inline(m[1])}</li>`; }
+      else if ((m = line.match(/^#{1,6}\s+(.*)/))) { close(); out += `<h4>${inline(m[1])}</h4>`; }
+      else if (line.trim()) { close(); out += `<p>${inline(line)}</p>`; }
+      else close();
+    }
+    close(); return out;
+  }
+  function card(cls, color, tag) {
+    const el = document.createElement("article"); el.className = cls; el.style.setProperty("--c", color);
+    el.innerHTML = `<div class="tag">${tag}</div><div class="body"></div><div class="wait">Generating…</div>`;
+    return el;
+  }
+  function fill(el, text, copyable) {
+    el.querySelector(".wait")?.remove(); el.querySelector(".body").innerHTML = md(text);
+    if (copyable && navigator.clipboard) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "copy"; b.textContent = "Copy";
+      b.onclick = () => navigator.clipboard.writeText(text).then(() => { b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy"), 1500); }, () => {});
+      el.prepend(b);
+    }
+  }
+  function fail(el, msg) { el.querySelector(".wait")?.remove(); const f = document.createElement("div"); f.className = "failed"; f.textContent = msg; el.append(f); }
+
+  $("ask").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (busy) return;
+    const prompt = $("q").value.trim(), format = $("fmt").value, minds = selected();
+    if (!prompt) return;
+    if (!minds.length) return setStatus("Pick at least one mind.", true);
+
+    busy = true; $("go").disabled = true; setStatus("The minds are generating…");
+    const turn = document.createElement("div"); turn.className = "turn";
+    const h = document.createElement("h3"); h.textContent = prompt + " · " + $("fmt").selectedOptions[0].text.toLowerCase(); turn.append(h);
+    const unified = card("unified", "#a855f7", "UNIFIED RESULT"); unified.querySelector(".wait").textContent = "Waiting for the minds…";
+    const grid = document.createElement("div"); grid.className = "minds";
+    turn.append(unified, grid); $("thread").prepend(turn);
+    const past = history.slice(-3);
+    let needSignIn = false;
+
+    const results = await Promise.all(minds.map(async (id) => {
+      const m = MINDS.find((x) => x.id === id);
+      const el = card("mind", m.color, m.name.toUpperCase()); grid.append(el);
+      try { const r = await call({ mode: "mind", mind: id, prompt, format, history: past }); fill(el, r.text); return { mind: id, text: r.text }; }
+      catch (e) { fail(el, e.message); if (e.code === "authentication_required") needSignIn = true; return { error: e }; }
+    }));
+    const answers = results.filter((r) => r.text);
+    if (!answers.length) fail(unified, results[0]?.error?.message || "No mind could generate a result.");
+    else if (answers.length === 1) { fill(unified, answers[0].text, true); history.push({ prompt, result: answers[0].text }); }
+    else {
+      unified.querySelector(".wait").textContent = "Combining the best of them…";
+      try { const r = await call({ mode: "synthesize", prompt, format, answers, history: past }); fill(unified, r.text, true); history.push({ prompt, result: r.text }); }
+      catch (e) { fail(unified, e.message); }
+    }
+    busy = false; $("go").disabled = false;
+    if (needSignIn) signInHint();
+    else if (answers.length) { $("q").value = ""; $("q").placeholder = "Refine it or ask for something new…"; setStatus("Done · refine it, or start over"); $("reset").hidden = false; }
+    else setStatus("");
+  });
+  $("reset").addEventListener("click", () => { history.length = 0; $("thread").innerHTML = ""; $("reset").hidden = true; setStatus(""); $("q").placeholder = "Example: A weekend community event that helps people live healthier and longer"; $("q").focus(); });
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("ask").requestSubmit(); });
+})();
+</script>
+</body>
+</html>
