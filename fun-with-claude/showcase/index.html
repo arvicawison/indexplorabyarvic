@@ -54,7 +54,7 @@ h1{margin:6px 0 4px;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.03em}
   function toast(m, c) { const t = document.createElement("div"); t.className = "toast"; t.style.setProperty("--c", c || "#a855f7"); t.textContent = m; $("toasts").append(t); setTimeout(() => t.remove(), 3500); }
   async function call(body) {
     let t = null; try { const raw = JSON.parse(localStorage.getItem("sb-zncmwdqqdgselvrmghwc-auth-token") || "null"); const s = raw?.currentSession ?? raw; if (s?.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) t = s.access_token; } catch {}
-    const res = await fetch(API, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(body) });
+    const res = await fetch(API, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(body) , signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.message || (res.status === 404 ? "The Showcase isn't deployed on this site yet." : "Something went wrong (" + res.status + ")."));
     return d;

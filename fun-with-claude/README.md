@@ -17,7 +17,7 @@ the existing app code; the page styles are copies kept in `fun-with-claude/asset
   no build step.
   Only listed button values are accepted; the SVG is sanitised on the server and shown as an
   <img>, so it can't run code. Back end: `netlify/functions/fun-with-claude-dash.mts` at
-  `POST /api/fun-with-claude/dash` (30 calls/minute per visitor).
+  `POST /api/fun-with-claude/dash` .
 - `/fun-with-claude/eight-minds/`: 8-Mind AI Generator. Eight Claude minds (Strategist,
   Scientist, Skeptic, Creator, Earner, Storyteller, Designer, Futurist) each generate a take on
   the visitor's idea in the chosen format; a Unified Mind merges them into one result.
@@ -63,15 +63,15 @@ runtime. Up to **20 builders** then write their modules at the same time (one re
 once if busy), and the page assembles them instantly. Each module's script runs isolated, so one
 broken module can't stop the others, and its error names the module for the quality check. Choose
 20/12/8/4 builders, or "1 builder (in parts)". If the Architect fails, it falls back to one builder.
-Builders use `FUN_CLAUDE_BUILDER_MODEL` (default `claude-haiku-5-5`, fast and light on credits);
-the Architect, minds and reviewer use `FUN_CLAUDE_MODEL`.
+Builders use the main model (`FUN_CLAUDE_BUILDER_MODEL`, default = `FUN_CLAUDE_MODEL`); if Claude is busy
+a builder retries with the lighter `FUN_CLAUDE_LITE_MODEL` (default `claude-haiku-5-5`).
 Every chat keeps a **feature ledger** of everything asked for so far; minds, huddle, Architect,
 builders and reviewer all receive it, so new versions keep every earlier feature and connect them.
 
 ## Request time limit
 Netlify Free cuts every request at about 30 seconds. Every Claude call is therefore sized to finish
 in time: single-builder parts are capped at 2,600 tokens (`FUN_CLAUDE_PART_TOKENS`) with a hard 24s
-timer (`FUN_CLAUDE_PART_MS`), and the page continues automatically (up to 6 parts). Evolution Dash streams
+timer (`FUN_CLAUDE_PART_MS`), and the page continues automatically (up to 12 parts). Evolution Dash streams
 internally and stops by about 25s (`FUN_CLAUDE_DASH_MS`), closing any unfinished artwork so it still
 displays. On a paid plan with a longer limit you can raise both values.
 
@@ -86,7 +86,6 @@ displays. On a paid plan with a longer limit you can raise both values.
 
 ## Cost and limits
 An App Generator run with all minds = 8 short planning calls + 1 huddle + 1 to 4 build parts
-(up to 8,000 output tokens each). Limit: 120 calls per visitor IP per minute, to stop runaway
-scripts rather than normal use.
+(up to 8,000 output tokens each). There is no per-visitor rate limit (owner's choice); `FUN_CLAUDE_PAUSED=true` stops everything at once.
 A generation with all eight minds = 9 Claude calls. Each visitor IP is limited to 54 calls a
 minute (about 6 generations). Watch usage in Netlify (or your Anthropic console if using your key).

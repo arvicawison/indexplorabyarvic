@@ -131,7 +131,7 @@ legend{font-size:12px;letter-spacing:.08em;font-weight:800;color:var(--muted);ma
 
   async function call(payload) {
     const t = token();
-    const res = await fetch(API, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(payload) });
+    const res = await fetch(API, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(payload) , signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
     let d = {}; try { d = await res.json(); } catch {}
     if (!res.ok) { const e = new Error(d.message || (res.status === 429 ? "Lots of creating going on: wait a moment and try again." : res.status === 404 ? "Evolution Dash isn't deployed on this site yet." : "Something went wrong (" + res.status + ").")); e.code = d.error || res.status; throw e; }
     return d;

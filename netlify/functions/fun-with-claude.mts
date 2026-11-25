@@ -129,9 +129,8 @@ function json(payload: unknown, status = 200) {
   return Response.json(payload, { status });
 }
 
-// Per-visitor rate limit (9 calls per finished generation with all minds on → ~6 generations/min).
 export const config = {
   path: "/api/fun-with-claude",
   method: "POST",
-  rateLimit: { action: "rate_limit", aggregateBy: ["ip", "domain"], windowSize: 60, windowLimit: 54 },
+  // No per-visitor rate limit (owner's choice). Use FUN_CLAUDE_PAUSED=true to stop everything at once.
 };

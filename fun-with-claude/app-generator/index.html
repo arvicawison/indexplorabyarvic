@@ -199,7 +199,7 @@ a{color:var(--blue)}
 (() => {
   const API = "/api/fun-with-claude/apps";
   const SESSION_KEY = "sb-zncmwdqqdgselvrmghwc-auth-token";
-  const MAX_PARTS = 6;
+  const MAX_PARTS = 12;
   const MINDS = [
     { id: "strategist", name: "Strategist", color: "#38bdf8" }, { id: "scientist", name: "Scientist", color: "#34d399" },
     { id: "skeptic", name: "Skeptic", color: "#f97316" },       { id: "creator", name: "Creator", color: "#ec4899" },
@@ -260,7 +260,12 @@ a{color:var(--blue)}
   }
   async function api(payload) {
     usage.calls++; renderUsage();
-    const res = await fetch(API, { method: "POST", headers: headers(), signal: controller.signal, body: JSON.stringify(payload) });
+    // Every request also has its own 45s safety timeout (the server always answers within ~30s),
+    // so a request that never answers fails cleanly instead of hanging the run.
+    const signal = AbortSignal.any && AbortSignal.timeout ? AbortSignal.any([controller.signal, AbortSignal.timeout(45000)]) : controller.signal;
+    let res;
+    try { res = await fetch(API, { method: "POST", headers: headers(), signal, body: JSON.stringify(payload) }); }
+    catch (e) { if (e.name === "TimeoutError" || (e.name === "AbortError" && !controller.signal.aborted)) throw Object.assign(new Error("The request took too long. Please try again."), { code: "timeout" }); throw e; }
     if (!res.ok) throw await errorFrom(res);
     return res;
   }
@@ -336,7 +341,7 @@ a{color:var(--blue)}
 
   // ---------- usage (shown openly) ----------
   function renderUsage() {
-    $("usage").innerHTML = `<div>This session: <b>${usage.calls}</b> Claude call${usage.calls === 1 ? "" : "s"} · <b>${(usage.tokens + usage.approx).toLocaleString()}</b> tokens${usage.approx ? " (≈)" : ""}</div><div>Limit: 120 calls a minute per visitor. Apps run in your browser.</div>`;
+    $("usage").innerHTML = `<div>This session: <b>${usage.calls}</b> Claude call${usage.calls === 1 ? "" : "s"} · <b>${(usage.tokens + usage.approx).toLocaleString()}</b> tokens${usage.approx ? " (≈)" : ""}</div><div>No per-visitor limit. Your Netlify plan's AI credits still apply. Apps run in your browser.</div>`;
   }
 
   // ---------- minds picker ----------
@@ -529,7 +534,9 @@ a{color:var(--blue)}
     else {
       const a = { label: `Architect: splitting the app into ${n} modules`, state: "run" }; steps.push(a); renderThreadSoon();
       const s0 = performance.now();
-      const r = await (await api({ mode: "architect", prompt: text, kind: c.kind, builders: n, blueprint, features: featuresOf(c) })).json();
+      let r;
+      try { r = await (await api({ mode: "architect", prompt: text, kind: c.kind, builders: n, blueprint, features: featuresOf(c) })).json(); }
+      catch (e) { if (e.name !== "AbortError") Object.assign(a, { label: "Architect couldn't plan the split", state: "err" }); throw e; }
       shell = r.shell; modules = r.modules; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
       Object.assign(a, { label: `Architect split "${shell.title || c.title}" into ${modules.length} modules`, state: "ok", meta: secs(performance.now() - s0), text: modules.map((m, i) => `${i + 1}. **${m.name}**: ${m.purpose}${m.listens?.length ? " (listens: " + m.listens.join(", ") + ")" : ""}`).join("\n") });
       log("ok", `Architect planned ${modules.length} modules`, performance.now() - s0);
@@ -542,14 +549,14 @@ a{color:var(--blue)}
     renderPanel(`/* ${modules.length} builders are writing their modules at the same time… */`);
     await Promise.all(modules.map(async (m, i) => {
       const mini = b.minis[i], t = performance.now();
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const r = await (await api({ mode: "module", prompt: text, kind: c.kind, features: featuresOf(c), module: m, shell, modules: modules.map(({ id, name, emits, listens }) => ({ id, name, emits, listens })), fixes: fixes || undefined })).json();
+          const r = await (await api({ mode: "module", prompt: text, kind: c.kind, features: featuresOf(c), module: m, shell, modules: modules.map(({ id, name, emits, listens }) => ({ id, name, emits, listens })), fixes: fixes || undefined, lite: attempt > 1 })).json();
           results[m.id] = r; mini.state = "ok"; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
           log("ok", `Builder ${i + 1} finished "${m.name}"`, performance.now() - t); break;
         } catch (e) {
           if (e.name === "AbortError") throw e;
-          if (attempt === 1 && /busy|Too many|429|502|504/i.test(e.message + e.code)) { await wait(1500 + Math.random() * 1500); continue; }
+          if (attempt < 3 && /busy|Too many|429|502|503|504|reach|error/i.test(e.message + e.code)) { log("info", `Builder ${i + 1} retrying${attempt === 1 ? " with the lighter model" : ""}`); await wait(1200 * attempt + Math.random() * 1500); continue; }
           mini.state = "err"; log("warn", `Builder ${i + 1} ("${m.name}"): ${e.message}`); break;
         }
       }

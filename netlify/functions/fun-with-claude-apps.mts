@@ -177,7 +177,7 @@ export default async (req: Request, context: any) => {
       }
       const html = typeof peek.html === "string" ? peek.html : "";
       const title = String(peek.title || "").replace(/<[^>]*>/g, "").trim().slice(0, 80);
-      if (!title || html.length < 50 || html.length > 150000 || !/<(body|div|main|canvas|section)/i.test(html)) return json({ error: "invalid_app", message: "That app is empty or too large to share." }, 400);
+      if (!title || html.length < 50 || html.length > 400000 || !/<(body|div|main|canvas|section)/i.test(html)) return json({ error: "invalid_app", message: "That app is empty or too large to share." }, 400);
       // Safety check on everything a visitor would read in the app.
       const visible = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 6000);
       const scripts = (html.match(/<script[\s\S]*?<\/script>/gi) || []).join("\n").slice(0, 6000);
@@ -237,7 +237,7 @@ export default async (req: Request, context: any) => {
   }
 
   if (body?.mode === "review") {
-    const html = typeof body?.html === "string" ? body.html.slice(0, 60000) : "";
+    const html = typeof body?.html === "string" ? body.html.slice(0, 100000) : "";
     if (!html) return json({ error: "html_required" }, 400);
     const runtime = (Array.isArray(body?.runtimeErrors) ? body.runtimeErrors : []).slice(0, 10).map((e: any) => String(e).slice(0, 300));
     const lint = (Array.isArray(body?.lint) ? body.lint : []).slice(0, 15).map((e: any) => String(e).slice(0, 200));
@@ -307,7 +307,8 @@ export default async (req: Request, context: any) => {
     const contract = `App name: ${String(shell.title || "").slice(0, 80)}\n\nShell CSS (variables and classes you can use):\n${String(shell.css || "").slice(0, 5000)}\n\nShell layout (your module replaces <!--MODULE:${id}-->):\n${String(shell.html || "").slice(0, 3000)}\n\nRuntime (window.App):\n${String(shell.js || "").slice(0, 3000)}\n\nAll modules being built in parallel:\n${others}`;
     const fixes = typeof body?.fixes === "string" ? `\n\nA review of the previous build found these problems; make sure your module avoids or fixes them:\n${body.fixes.slice(0, 2500)}` : "";
     const r = await claude(base, key, {
-      model: Netlify.env.get("FUN_CLAUDE_BUILDER_MODEL") || "claude-haiku-5-5", max_tokens: 1800, system: BUILDER.replace(/ID/g, id),
+      // Builders use the main model; if Claude is busy the page retries with the lighter model ("lite").
+      model: body?.lite ? (Netlify.env.get("FUN_CLAUDE_LITE_MODEL") || "claude-haiku-5-5") : (Netlify.env.get("FUN_CLAUDE_BUILDER_MODEL") || model), max_tokens: 1800, system: BUILDER.replace(/ID/g, id),
       messages: [{ role: "user", content: `${request}${ledger(body?.features)}\n\n${contract}\n\nYOUR MODULE\nid: ${id}\nname: ${String(m.name || "").slice(0, 60)}\npurpose: ${String(m.purpose || "").slice(0, 200)}\nspec: ${String(m.spec || "").slice(0, 800)}\nemits: ${(m.emits || []).join(", ")}\nlistens: ${(m.listens || []).join(", ")}${fixes}` }],
     }, 27000);
     if (!r.ok) { log({ who, mode: "module", module: id, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
@@ -478,9 +479,8 @@ function json(payload: unknown, status = 200) {
   return Response.json(payload, { status });
 }
 
-// Generous per-visitor limit: 120 calls a minute (about 10 full builds) to stop runaway scripts only.
 export const config = {
   path: "/api/fun-with-claude/apps",
   method: "POST",
-  rateLimit: { action: "rate_limit", aggregateBy: ["ip", "domain"], windowSize: 60, windowLimit: 120 },
+  // No per-visitor rate limit (owner's choice). Use FUN_CLAUDE_PAUSED=true to stop everything at once.
 };

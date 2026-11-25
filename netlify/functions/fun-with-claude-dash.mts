@@ -282,5 +282,5 @@ function json(payload: unknown, status = 200) { return Response.json(payload, { 
 export const config = {
   path: "/api/fun-with-claude/dash",
   method: "POST",
-  rateLimit: { action: "rate_limit", aggregateBy: ["ip", "domain"], windowSize: 60, windowLimit: 40 },
+  // No per-visitor rate limit (owner's choice). Use FUN_CLAUDE_PAUSED=true to stop everything at once.
 };
