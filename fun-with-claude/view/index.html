@@ -18,7 +18,7 @@ iframe{flex:1;width:100%;border:0;background:#fff}
 </style>
 </head>
 <body>
-<div class="bar"><div><b id="title">Shared app</b> <small>· made with <a href="../app-generator/">Fun with Claude</a> · runs in a locked sandbox and can't send data anywhere</small></div>
+<div class="bar"><div><b id="title">Shared app</b> <small>· made with <a href="../app-generator/">Fun with Claude</a> · <a href="../showcase/">Showcase</a> · runs in a locked sandbox and can't send data anywhere</small></div>
 <div><button type="button" id="remix" hidden>Remix in the generator</button> <button type="button" id="dl" hidden>Download</button></div></div>
 <div id="out" class="msg">Opening the app…</div>
 <script>
@@ -28,11 +28,19 @@ iframe{flex:1;width:100%;border:0;background:#fff}
   const fail = (m) => { out.textContent = m; };
   try {
     const params = new URLSearchParams(location.hash.slice(1));
-    const data = params.get("app");
-    if (!data) return fail("This link doesn't contain an app. Ask the person who shared it for the full link.");
-    const bin = Uint8Array.from(atob(data.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
-    const html = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
-    const title = (params.get("t") || "Shared app").slice(0, 80);
+    let html, title;
+    if (params.get("s")) { // an app from the public Showcase
+      const res = await fetch("/api/fun-with-claude/apps", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "showcase_get", id: params.get("s") }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) return fail(d.message || "This app couldn't be loaded from the Showcase.");
+      html = d.app.html; title = String(d.app.title || "Shared app").slice(0, 80);
+    } else {
+      const data = params.get("app");
+      if (!data) return fail("This link doesn't contain an app. Ask the person who shared it for the full link.");
+      const bin = Uint8Array.from(atob(data.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+      html = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+      title = (params.get("t") || "Shared app").slice(0, 80);
+    }
     document.getElementById("title").textContent = title; document.title = title + " | Fun with Claude";
     const h = html.match(/<head[^>]*>/i), d = html.match(/<!doctype[^>]*>/i);
     const locked = h ? html.replace(h[0], h[0] + CSP) : d ? html.replace(d[0], d[0] + CSP) : CSP + html;

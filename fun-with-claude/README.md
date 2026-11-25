@@ -52,6 +52,16 @@ variables, scope: Functions) and redeploy. Your own key always takes priority ov
 Optional: `FUN_CLAUDE_MODEL` (default `claude-sonnet-5-5`), `FUN_CLAUDE_REQUIRE_SIGNIN`
 (`true`/`false`). By default the live site requires an Indexplora sign-in and previews do not.
 
+- `/fun-with-claude/showcase/`: public App Showcase. "Share 🌍" in the App Generator publishes an app
+  (Netlify Blobs store `fwc-showcase`) after an all-ages safety check; anyone can open it at
+  `/fun-with-claude/view/#s=<id>` or remix it. The sharing device keeps a private owner key to remove it.
+
+## Request time limit
+Netlify Free cuts every request at about 30 seconds. Builds therefore stream in parts of about 22s
+(`FUN_CLAUDE_PART_MS`) and the page continues automatically (up to 6 parts). Evolution Dash streams
+internally and stops by about 25s (`FUN_CLAUDE_DASH_MS`), closing any unfinished artwork so it still
+displays. On a paid plan with a longer limit you can raise both values.
+
 ## Owner controls and logs
 - `FUN_CLAUDE_PAUSED=true` switches the App Generator off immediately (redeploy to apply).
 - Server logs: one JSON line per request in Netlify > Logs > Functions (hashed user id, mode,

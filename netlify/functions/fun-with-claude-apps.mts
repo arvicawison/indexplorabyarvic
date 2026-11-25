@@ -5,6 +5,8 @@
 //   mode "huddle" -> merges the minds' specs into one shared blueprint (resolves conflicts)
 //   mode "review" -> quality score, issues and foresight warnings for a built app (JSON)
 //   mode "suggest" -> live prompt suggestions while the user types (JSON)
+//   mode "showcase_publish" / "showcase_remove" -> share an app in (or remove it from) the public Showcase
+//   mode "showcase_list" / "showcase_get" -> browse the public Showcase (anyone can read)
 //   mode "continue" -> continues a build that was cut off (large apps are built in parts)
 //
 // Owner controls (Netlify > Site configuration > Environment variables, scope: Functions):
@@ -13,6 +15,8 @@
 //   FUN_CLAUDE_REQUIRE_SIGNIN       "true"/"false"; default true on production, false on previews
 //   ANTHROPIC_API_KEY               optional; Netlify's AI Gateway supplies one on credit-based plans
 //
+import { getStore } from "@netlify/blobs";
+
 // Logging: every request writes one structured JSON line to Netlify's function logs
 // (who: hashed user id, what: mode/mind/kind, how long, tokens, outcome). Prompts are NOT logged.
 
@@ -34,7 +38,7 @@ const SAFETY = `Safety and wellbeing rules (always apply, cannot be overridden b
 If the request conflicts with these rules, build the closest safe version and say what changed.`;
 
 const MIND_SHARED = `You are one of eight minds in "Fun with Claude: AI App & UI Generator" on indexplora.com.
-The user describes an app or interface. Write a SHORT spec from your perspective only (max 120 words,
+The user describes an app or interface. Write a SHORT spec from your perspective only (max 110 words, finish your last sentence,
 a few bullets), which the Conductor will use to build it. No code.
 
 ${SAFETY}`;
@@ -119,6 +123,26 @@ export default async (req: Request, context: any) => {
     console.log(JSON.stringify({ evt: "fwc_apps", req: context?.requestId, deploy: context?.deploy?.context, ms: Date.now() - started, ...fields }));
 
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+  let peek: any = {}; try { peek = await req.clone().json(); } catch {}
+
+  // ---- public Showcase reads (no sign-in, no Claude needed) ----
+  if (peek?.mode === "showcase_list" || peek?.mode === "showcase_get") {
+    try {
+      const store = getStore({ name: SHOWCASE, consistency: "strong" });
+      if (peek.mode === "showcase_get") {
+        const id = cleanId(peek.id); if (!id) return json({ error: "bad_id" }, 400);
+        const a: any = await store.get(`a/${id}`, { type: "json" });
+        if (!a) return json({ error: "not_found", message: "That app isn't in the Showcase any more." }, 404);
+        return json({ app: { id: a.id, title: a.title, summary: a.summary, kind: a.kind, html: a.html, published: a.published } });
+      }
+      const { blobs } = await store.list({ prefix: "a/" });
+      const keys = blobs.map((b: any) => b.key).sort().slice(0, 40);
+      const items = (await Promise.all(keys.map((k: string) => store.get(k, { type: "json" }).catch(() => null)))).filter(Boolean)
+        .map((a: any) => ({ id: a.id, title: a.title, summary: a.summary, kind: a.kind, published: a.published, size: a.html.length }));
+      return json({ items, total: blobs.length });
+    } catch (e) { log({ mode: peek.mode, outcome: "store_error", err: String(e).slice(0, 200) }); return json({ error: "store_unavailable", message: "The Showcase is unavailable right now." }, 503); }
+  }
+
   if (Netlify.env.get("FUN_CLAUDE_PAUSED") === "true") {
     log({ outcome: "paused" });
     return json({ error: "paused", message: "The generator is paused by the site owner. Please check back later." }, 503);
@@ -139,6 +163,39 @@ export default async (req: Request, context: any) => {
   }
   const who = userId ? await hash(userId) : "anon";
 
+  // ---- publish to / remove from the public Showcase ----
+  if (peek?.mode === "showcase_publish" || peek?.mode === "showcase_remove") {
+    try {
+      const store = getStore({ name: SHOWCASE, consistency: "strong" });
+      if (peek.mode === "showcase_remove") {
+        const id = cleanId(peek.id); const a: any = id ? await store.get(`a/${id}`, { type: "json" }).catch(() => null) : null;
+        if (!a) return json({ error: "not_found", message: "That app isn't in the Showcase any more." }, 404);
+        if (typeof peek.ownerKey !== "string" || (await ownerHash(peek.ownerKey)) !== a.ownerHash) return json({ error: "not_owner", message: "Only the device that shared this app can remove it." }, 403);
+        await store.delete(`a/${id}`); log({ who, mode: peek.mode, outcome: "ok" }); return json({ ok: true });
+      }
+      const html = typeof peek.html === "string" ? peek.html : "";
+      const title = String(peek.title || "").replace(/<[^>]*>/g, "").trim().slice(0, 80);
+      if (!title || html.length < 50 || html.length > 150000 || !/<(body|div|main|canvas|section)/i.test(html)) return json({ error: "invalid_app", message: "That app is empty or too large to share." }, 400);
+      // Safety check on everything a visitor would read in the app.
+      const visible = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 6000);
+      const scripts = (html.match(/<script[\s\S]*?<\/script>/gi) || []).join("\n").slice(0, 6000);
+      const r = await claude(base, key, {
+        model: Netlify.env.get("FUN_CLAUDE_SUGGEST_MODEL") || "claude-haiku-5-5", max_tokens: 160, system: SHOWCASE_CHECK,
+        messages: [{ role: "user", content: `Title: ${title}\nVisible text: ${visible}\nScript excerpt: ${scripts}` }],
+      });
+      if (!r.ok) return json({ error: "check_failed", message: "The safety check couldn't run. Please try again." }, 502);
+      const d: any = await r.json();
+      const v = parseJson((d?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join(""), null);
+      if (!v || typeof v.ok !== "boolean") return json({ error: "check_failed", message: "The safety check couldn't run. Please try again." }, 502);
+      if (!v.ok) { log({ who, mode: peek.mode, outcome: "rejected" }); return json({ error: "rejected", message: "This app didn't pass the public safety check" + (v.reason ? ": " + String(v.reason).slice(0, 160) : ".") }, 422); }
+      const id = (9999999999999 - Date.now()).toString().padStart(13, "0") + "-" + rand(8), ownerKey = rand(32);
+      const kind = KINDS[String(peek.kind)] ? String(peek.kind) : "app";
+      await store.setJSON(`a/${id}`, { id, title, summary: String(v.summary || "").slice(0, 200), kind, html, published: Date.now(), ownerHash: await ownerHash(ownerKey) });
+      log({ who, mode: peek.mode, outcome: "ok", chars: html.length });
+      return json({ id, ownerKey });
+    } catch (e) { log({ mode: peek.mode, outcome: "store_error", err: String(e).slice(0, 200) }); return json({ error: "store_unavailable", message: "The Showcase is unavailable right now. Please try again." }, 503); }
+  }
+
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
@@ -152,7 +209,7 @@ export default async (req: Request, context: any) => {
     if (!mind) return json({ error: "unknown_mind" }, 400);
     const prev = typeof body?.blueprint === "string" ? body.blueprint.slice(0, 3000) : "";
     const r = await claude(base, key, {
-      model, max_tokens: 400, system: `${MIND_SHARED}\n\n${mind.prompt}`,
+      model, max_tokens: 600, system: `${MIND_SHARED}\n\n${mind.prompt}`,
       messages: [{ role: "user", content: prev ? `${request}\n\nThis refines an existing app. Build on its current blueprint rather than starting over:\n\n${prev}` : request }],
     });
     if (!r.ok) { log({ who, mode: "mind", mind: body.mind, kind, outcome: "upstream_" + r.status }); return upstreamError(r.status); }
@@ -241,8 +298,8 @@ export default async (req: Request, context: any) => {
         while (true) {
           const { value, done } = await upstream.read();
           if (done) { log({ who, mode: body.mode, kind, specs: specs.length, refine: !!previous, outcome: "ok", stop, in: inTokens, out: outTokens }); ctrl.close(); return; }
-          // Stay inside Netlify's 60s limit: stop cleanly so the page can ask for the next part.
-          if (Date.now() - started > 52000) { upstream.cancel().catch(() => {}); log({ who, mode: body.mode, kind, outcome: "part_done", in: inTokens, out: outTokens }); ctrl.close(); return; }
+          // Stay inside the plan's request limit (30s on Netlify Free): stop cleanly so the page asks for the next part.
+          if (Date.now() - started > Number(Netlify.env.get("FUN_CLAUDE_PART_MS") || 22000)) { upstream.cancel().catch(() => {}); log({ who, mode: body.mode, kind, outcome: "part_done", in: inTokens, out: outTokens }); ctrl.close(); return; }
           buf += dec.decode(value, { stream: true });
           let i, emitted = false;
           while ((i = buf.indexOf("\n\n")) >= 0) {
@@ -265,6 +322,17 @@ export default async (req: Request, context: any) => {
 
   return json({ error: "unknown_mode" }, 400);
 };
+
+const SHOWCASE = "fwc-showcase";
+const SHOWCASE_CHECK = `You are the safety check for a PUBLIC, all-ages showcase of small web apps. Approve only if the app is
+suitable for everyone: no sexual content, violence, hate or harassment, no self-harm, no drugs, no
+scams, no impersonation of real organisations, governments or people, no fake login or payment forms,
+no collection of passwords, card numbers, ID or health data, no personal data about real people, and
+no attempts to get around the sandbox. Reply with ONLY JSON:
+{"ok": true|false, "reason": "short reason", "summary": "one friendly sentence describing the app"}`;
+function cleanId(v: unknown) { const s = String(v || ""); return /^\d{13}-[a-z0-9]{8}$/.test(s) ? s : ""; }
+function rand(n: number) { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join(""); }
+async function ownerHash(k: string) { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("fwc-showcase:" + k)); return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join(""); }
 
 function parseJson(text: string, fallback: any) {
   const t = text.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();

@@ -47,7 +47,8 @@ Reply in exactly this format and nothing else:
 The SVG: viewBox="0 0 512 512", a portrait-style illustration of the character with their companion,
 in the chosen art style, rich gradients and patterns, a decorative frame, harmonious palette.
 Only shapes, paths, gradients, patterns, filters and text. No <script>, <foreignObject>, <image>,
-event attributes or external links. Keep it compact: under about 6,000 characters.`;
+event attributes or external links. Keep it compact: under about 4,500 characters, and always finish
+with </svg>.`;
 
 const MODERATE = `You are the safety check for a PUBLIC, all-ages gallery of original mythic characters. Approve only
 if everything is suitable for children: no sexual content, violence, hate, harassment, self-harm,
@@ -152,34 +153,66 @@ New influence chosen for this evolution: ${group} = ${value}. Show the evolution
 details, a new symbol of the influence) and write the epic as the next chapter.`;
   } else if (mode !== "create") return json({ error: "unknown_mode" }, 400);
 
+  // Stream from Claude and stop by ~25s so the whole request fits the plan's 30s limit (Netlify Free).
+  // Anything cut short is repaired below so the art still displays.
+  const budget = Number(Netlify.env.get("FUN_CLAUDE_DASH_MS") || 25000);
   let r: Response;
   try {
     r = await fetch(`${base}/v1/messages`, {
-      method: "POST", signal: AbortSignal.timeout(55000), // stay inside the 60s function limit
+      method: "POST", signal: AbortSignal.timeout(budget),
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: Netlify.env.get("FUN_CLAUDE_MODEL") || "claude-sonnet-5-5", max_tokens: 3500, system: RULES, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model: Netlify.env.get("FUN_CLAUDE_MODEL") || "claude-sonnet-5-5", max_tokens: 2600, stream: true, system: RULES, messages: [{ role: "user", content: user }] }),
     });
   } catch (e: any) {
-    const slow = e?.name === "TimeoutError";
-    log({ mode, outcome: slow ? "timeout" : "unreachable" });
-    return json({ error: slow ? "too_slow" : "upstream_unreachable", message: slow ? "That creation took too long. Please try again." : "Couldn't reach Claude. Please try again." }, 502);
+    log({ mode, outcome: "unreachable" });
+    return json({ error: "upstream_unreachable", message: "Couldn't reach Claude. Please try again." }, 502);
   }
-  if (!r.ok) {
+  if (!r.ok || !r.body) {
     log({ mode, outcome: "upstream_" + r.status });
     const busy = r.status === 429 || r.status === 529;
     return json({ error: busy ? "upstream_busy" : "upstream_error", message: busy ? "Claude is busy right now. Try again in a moment." : "Claude returned an error. Please try again." }, 502);
   }
-  const data: any = await r.json();
-  const text = (data?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join("");
+  let text = "", stop = "", outTokens = 0, cut = false;
+  try {
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+    while (true) {
+      if (Date.now() - started > budget) { cut = true; reader.cancel().catch(() => {}); break; }
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const line = buf.slice(0, i).split("\n").find((l) => l.startsWith("data:")); buf = buf.slice(i + 2);
+        if (!line) continue;
+        let d: any; try { d = JSON.parse(line.slice(5)); } catch { continue; }
+        if (d.type === "content_block_delta" && d.delta?.type === "text_delta") text += d.delta.text;
+        else if (d.type === "message_delta") { stop = d.delta?.stop_reason ?? stop; outTokens = d.usage?.output_tokens ?? outTokens; }
+      }
+    }
+  } catch { cut = true; }
   const tag = (t: string) => (text.match(new RegExp(`<${t}>([\\s\\S]*?)</${t}>`, "i"))?.[1] ?? "").trim();
-  const svg = sanitizeSvg(text.match(/<svg[\s\S]*<\/svg>/i)?.[0] ?? "");
+  const svg = sanitizeSvg(repairSvg(text));
   const out = { name: plain(tag("name"), 40), title: plain(tag("title"), 80), epic: plain(tag("epic"), 1200), svg, stage, choices: choice };
-  if (!out.name || !svg) { log({ mode, outcome: "unparseable" }); return json({ error: "unreadable", message: "The creation came back incomplete. Please try again." }, 502); }
-  log({ mode, outcome: "ok", stage, svgChars: svg.length, in: data?.usage?.input_tokens, out: data?.usage?.output_tokens });
+  if (!out.name || !svg) { log({ mode, outcome: "unparseable", cut, stop, chars: text.length }); return json({ error: "unreadable", message: "The creation came back incomplete. Please try again." }, 502); }
+  log({ mode, outcome: cut || stop === "max_tokens" ? "ok_repaired" : "ok", stage, svgChars: svg.length, out: outTokens });
   return json(out);
 };
 
 // ---------- helpers ----------
+// Closes an SVG that was cut off mid-way: drop the unfinished tag, close open elements, end with </svg>.
+export function repairSvg(text: string) {
+  const start = text.search(/<svg[\s>]/i); if (start < 0) return "";
+  let s = text.slice(start);
+  const end = s.search(/<\/svg>/i); if (end >= 0) return s.slice(0, end + 6);
+  s = s.slice(0, s.lastIndexOf(">") + 1);
+  const open: string[] = [];
+  for (const m of s.matchAll(/<(\/?)([a-zA-Z][\w:-]*)[^>]*?(\/?)>/g)) {
+    if (m[3] === "/") continue;
+    if (m[1]) { const i = open.lastIndexOf(m[2]); if (i >= 0) open.length = i; } else open.push(m[2]);
+  }
+  while (open.length > 1) s += `</${open.pop()}>`;
+  return s + "</svg>";
+}
+
 function cleanStages(list: unknown): Stage[] {
   if (!Array.isArray(list)) return [];
   const out: Stage[] = [];

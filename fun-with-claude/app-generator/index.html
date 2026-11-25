@@ -173,6 +173,7 @@ a{color:var(--blue)}
     <button type="button" class="ib" id="bFull" title="Full screen" aria-label="Full screen">⤢</button>
     <button type="button" class="ib" id="bCopy">Copy</button>
     <button type="button" class="ib" id="bDl">Download</button>
+    <button type="button" class="ib" id="bShare" title="Share in the public Showcase">Share 🌍</button>
     <button type="button" class="ib deploy" id="bDeploy">Deploy</button>
   </div>
   <div class="pbody">
@@ -197,7 +198,7 @@ a{color:var(--blue)}
 (() => {
   const API = "/api/fun-with-claude/apps";
   const SESSION_KEY = "sb-zncmwdqqdgselvrmghwc-auth-token";
-  const MAX_PARTS = 4;
+  const MAX_PARTS = 6;
   const MINDS = [
     { id: "strategist", name: "Strategist", color: "#38bdf8" }, { id: "scientist", name: "Scientist", color: "#34d399" },
     { id: "skeptic", name: "Skeptic", color: "#f97316" },       { id: "creator", name: "Creator", color: "#ec4899" },
@@ -378,7 +379,7 @@ a{color:var(--blue)}
     if (s.foresight) det += "<ul>" + s.foresight.map((f) => `<li>${f.level === "warning" ? "⚠️" : "ℹ️"} <b>${esc(f.affects)}</b>: ${esc(f.note)}</li>`).join("") + "</ul>";
     if (s.text) det += md(s.text);
     if (s.link) det += `<div class="actions"><a class="ib" href="${esc(s.link)}" target="_blank" rel="noopener" style="text-decoration:none">Open deployed app ↗</a><button type="button" class="ib" data-copy="${esc(s.link)}">Copy link</button></div>`;
-    if (s.version) det += `<div class="actions"><button type="button" class="ib" data-open="${s.version}">Open v${s.version}</button><button type="button" class="ib" data-deploy="${s.version}">Deploy v${s.version}</button></div>`;
+    if (s.version) det += `<div class="actions"><button type="button" class="ib" data-open="${s.version}">Open v${s.version}</button><button type="button" class="ib" data-deploy="${s.version}">Deploy v${s.version}</button><button type="button" class="ib" data-share="${s.version}">Share v${s.version} 🌍</button></div>`;
     const open = s.open || s.state === "run" ? " open" : "";
     return `<details class="step st-${s.state}"${open}><summary><span class="ic">${icon}</span><span class="lbl">${esc(s.label)}</span><span class="meta">${esc(s.meta || "")}</span></summary>${det ? `<div class="det">${det}</div>` : ""}</details>`;
   }
@@ -398,13 +399,14 @@ a{color:var(--blue)}
     if (b.dataset.idea) { $("prompt").value = b.dataset.idea; $("prompt").focus(); }
     if (b.dataset.open) { shownVersion = +b.dataset.open; renderPanel(); setView("preview"); showApp(); }
     if (b.dataset.deploy) deploy(+b.dataset.deploy);
+    if (b.dataset.share) share(+b.dataset.share);
     if (b.dataset.copy) navigator.clipboard?.writeText(b.dataset.copy).then(() => toast("Link copied", "#34d399"));
   });
   function currentVersion() { const c = active(); if (!c || !c.versions.length) return null; return c.versions.find((v) => v.n === shownVersion) || c.versions[c.versions.length - 1]; }
   function renderPanel(streamText) {
     const c = active(), v = currentVersion();
     $("ver").innerHTML = c && c.versions.length ? c.versions.map((x) => `<option value="${x.n}" ${v && x.n === v.n ? "selected" : ""}>v${x.n}</option>`).join("") : "<option>No versions yet</option>";
-    ["bFull", "bCopy", "bDl", "bDeploy", "ver"].forEach((id) => ($(id).disabled = !v || streamText != null));
+    ["bFull", "bCopy", "bDl", "bDeploy", "bShare", "ver"].forEach((id) => ($(id).disabled = !v || streamText != null));
     if (streamText != null) { $("ph").hidden = true; $("code").textContent = streamText; showPane("code"); $("code").scrollTop = $("code").scrollHeight; return; }
     $("ph").hidden = !!v; $("code").textContent = v ? v.html : "";
     if (v && $("frame").dataset.v !== c.id + ":" + v.n) loadFrame(lockDown(v.html, true), c.id + ":" + v.n);
@@ -433,6 +435,7 @@ a{color:var(--blue)}
   $("bCopy").onclick = () => { const v = currentVersion(); v && navigator.clipboard?.writeText(v.html).then(() => toast("Code copied", "#34d399"), () => toast("Couldn't copy", "#f59e0b")); };
   $("bDl").onclick = () => { const v = currentVersion(); v && download(slug(active().title) + "-v" + v.n + ".html", v.html, "text/html"); };
   $("bDeploy").onclick = () => { const v = currentVersion(); v && deploy(v.n); };
+  $("bShare").onclick = () => { const v = currentVersion(); v && share(v.n); };
   $("bFull").onclick = () => {
     const v = currentVersion(); if (!v) return;
     const w = document.createElement("div"); w.className = "full";
@@ -449,6 +452,26 @@ a{color:var(--blue)}
   function showApp() { document.body.dataset.view = "app"; $("viewBtn").textContent = "◂ Chat"; }
   function showChat() { document.body.dataset.view = "chat"; $("viewBtn").textContent = "App ▸"; }
   $("viewBtn").onclick = () => (document.body.dataset.view === "chat" ? showApp() : showChat());
+
+  // ---------- share in the public Showcase (after a safety check) ----------
+  async function share(n) {
+    const c = active(), v = c?.versions.find((x) => x.n === n); if (!v || busy) return;
+    const step = { label: `Sharing v${n} in the public Showcase: safety check…`, state: "run" };
+    c.messages.push({ role: "assistant", steps: [step] }); renderThread(); showChat();
+    try {
+      usage.calls++; renderUsage();
+      const res = await fetch(API, { method: "POST", headers: headers(), body: JSON.stringify({ mode: "showcase_publish", title: c.title, kind: c.kind, html: v.html }) });
+      if (!res.ok) throw await errorFrom(res);
+      const r = await res.json();
+      try { const mine = JSON.parse(store.get("fwc.showcase.mine") || "[]"); mine.unshift({ id: r.id, ownerKey: r.ownerKey, title: c.title }); store.set("fwc.showcase.mine", JSON.stringify(mine.slice(0, 50))); } catch {}
+      const link = new URL("../view/", location.href).href + "#s=" + r.id;
+      Object.assign(step, { label: `Shared v${n} in the public Showcase`, state: "ok", link, open: true, text: "Passed the all-ages safety check. Anyone can now find it in the public Showcase, open it and remix it." });
+      log("ok", `Shared v${n} in the Showcase`); toast("Shared in the public Showcase 🌍", "#34d399");
+    } catch (e) {
+      Object.assign(step, { label: `Couldn't share v${n}`, state: "err", text: e.message, open: true }); log("error", "Share: " + e.message);
+    }
+    c.updated = Date.now(); save(); renderAll();
+  }
 
   // ---------- deploy: a shareable link; the app travels inside the link, nothing stored on a server ----------
   async function deploy(n) {
