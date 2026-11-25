@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>App Showcase | Fun with Claude | Indexplora</title>
+<meta name="description" content="Apps built with the Fun with Claude App Generator and shared by players. Open any app, then remix it into your own.">
+<link rel="canonical" href="https://indexplora.com/fun-with-claude/showcase/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0b0c;--panel:#141416;--line:#26262a;--ink:#f4f4f5;--muted:#a1a1aa;--soft:#1b1b1f;--accent:#a855f7;--blue:#38bdf8}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 80% -10%,#12233a 0,transparent 50%),radial-gradient(ellipse at 0% 20%,#2a1240 0,transparent 40%),var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+a{color:var(--blue)}:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;background:var(--panel);padding:6px 10px;border-radius:8px;z-index:9}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;border-bottom:1px solid var(--line);background:#0b0b0cd9;backdrop-filter:blur(10px)}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-weight:700;white-space:nowrap}
+.mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(120deg,#ec4899,#a855f7,#38bdf8);display:grid;place-items:center;font-size:13px}
+.crumb{color:var(--muted);font-size:13px}.sp{flex:1}
+.ib{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer;font:600 13px/1 inherit;text-decoration:none;color:var(--ink);white-space:nowrap;display:inline-block}
+.ib:hover{border-color:#3f3f46}.ib.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+.wrap{max-width:1180px;margin:auto;padding:18px 16px 60px}
+h1{margin:6px 0 4px;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.03em}
+.lead{margin:0 0 18px;color:var(--muted);max-width:680px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;animation:in .45s ease both;animation-delay:calc(var(--i) * 45ms)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+.card h2{margin:0;font-size:17px}.card p{margin:0;color:#d4d4d8;font-size:14px;flex:1}
+.meta{color:var(--muted);font-size:12px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.yours{font-size:11px;font-weight:800;color:#111;background:#facc15;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+.empty{color:var(--muted);padding:30px 0}
+.toasts{position:fixed;right:14px;bottom:14px;z-index:20;display:grid;gap:8px}
+.toast{background:#18181b;border:1px solid var(--line);border-left:4px solid var(--c,#a855f7);border-radius:10px;padding:9px 12px}
+@media(max-width:600px){.crumb{display:none}}
+@media(prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><a class="brand" href="../"><span class="mark" aria-hidden="true">✦</span>Fun with Claude</a><span class="crumb">/ Showcase</span><span class="sp"></span><a class="ib primary" href="../app-generator/">Build an app</a></header>
+<main id="main" class="wrap">
+<h1>🌍 App Showcase</h1>
+<p class="lead">Apps built with the App Generator and shared by players. Every app passed an all-ages safety check and runs in a locked sandbox. Open one, then remix it into your own.</p>
+<div class="grid" id="grid" aria-live="polite"><p class="empty">Loading the Showcase…</p></div>
+</main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script>
+(() => {
+  const API = "/api/fun-with-claude/apps";
+  const KIND = { app: "Interactive app", landing: "Landing page", dashboard: "Dashboard", tool: "Calculator / tool", game: "Mini game", form: "Multi-step form", assistant: "AI-assistant style UI" };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const mine = () => { try { const m = JSON.parse(localStorage.getItem("fwc.showcase.mine") || "[]"); return Array.isArray(m) ? m : []; } catch { return []; } };
+  function toast(m, c) { const t = document.createElement("div"); t.className = "toast"; t.style.setProperty("--c", c || "#a855f7"); t.textContent = m; $("toasts").append(t); setTimeout(() => t.remove(), 3500); }
+  async function call(body) {
+    let t = null; try { const raw = JSON.parse(localStorage.getItem("sb-zncmwdqqdgselvrmghwc-auth-token") || "null"); const s = raw?.currentSession ?? raw; if (s?.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) t = s.access_token; } catch {}
+    const res = await fetch(API, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify(body) , signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.message || (res.status === 404 ? "The Showcase isn't deployed on this site yet." : "Something went wrong (" + res.status + ")."));
+    return d;
+  }
+  async function load() {
+    try {
+      const { items } = await call({ mode: "showcase_list" });
+      const own = new Map(mine().map((m) => [m.id, m.ownerKey]));
+      if (!items.length) { $("grid").innerHTML = `<p class="empty">No apps shared yet. <a href="../app-generator/">Build one</a> and tap Share 🌍.</p>`; return; }
+      $("grid").innerHTML = items.map((a, i) => `<article class="card" style="--i:${i}"><h2>${esc(a.title)}${own.has(a.id) ? '<span class="yours">YOURS</span>' : ""}</h2><p>${esc(a.summary || "")}</p>
+        <div class="meta">${esc(KIND[a.kind] || "App")} · ${new Date(a.published).toLocaleDateString()} · ${(a.size / 1024).toFixed(0)} KB</div>
+        <div class="row"><a class="ib primary" href="../view/#s=${esc(a.id)}">Open ↗</a><button type="button" class="ib" data-remix="${esc(a.id)}">Remix</button><button type="button" class="ib" data-copy="${esc(a.id)}">Copy link</button>${own.has(a.id) ? `<button type="button" class="ib" data-remove="${esc(a.id)}">Remove</button>` : ""}</div></article>`).join("");
+    } catch (e) { $("grid").innerHTML = `<p class="empty">${esc(e.message)}</p>`; }
+  }
+  $("grid").addEventListener("click", async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.copy) navigator.clipboard?.writeText(new URL("../view/#s=" + b.dataset.copy, location.href).href).then(() => toast("Link copied", "#34d399"));
+    if (b.dataset.remix) {
+      try { const { app } = await call({ mode: "showcase_get", id: b.dataset.remix }); sessionStorage.setItem("fwc.remix", JSON.stringify({ title: app.title, html: app.html })); location.href = "../app-generator/#remix"; }
+      catch (err) { toast(err.message, "#f87171"); }
+    }
+    if (b.dataset.remove) {
+      if (!confirm("Remove this app from the public Showcase?")) return;
+      const key = mine().find((m) => m.id === b.dataset.remove)?.ownerKey;
+      try { await call({ mode: "showcase_remove", id: b.dataset.remove, ownerKey: key }); localStorage.setItem("fwc.showcase.mine", JSON.stringify(mine().filter((m) => m.id !== b.dataset.remove))); toast("Removed", "#a855f7"); load(); }
+      catch (err) { toast(err.message, "#f87171"); }
+    }
+  });
+  load();
+})();
+</script>
+</body>
+</html>

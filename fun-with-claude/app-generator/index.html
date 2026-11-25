@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>App Generator | Fun with Claude | Indexplora</title>
+<meta name="description" content="Chat to build apps: eight Claude minds plan, huddle on one blueprint, the Conductor builds, and you deploy a shareable link.">
+<link rel="canonical" href="https://indexplora.com/fun-with-claude/app-generator/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0b0c;--side:#111113;--panel:#141416;--line:#26262a;--ink:#f4f4f5;--muted:#a1a1aa;--soft:#1b1b1f;--accent:#a855f7;--blue:#38bdf8;--ok:#34d399;--warn:#f59e0b;--err:#f87171}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+button,select,textarea{font:inherit;color:inherit}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;z-index:99;background:var(--panel);padding:6px 10px;border-radius:8px}
+.app{display:grid;grid-template-columns:250px minmax(340px,1fr) minmax(380px,1.25fr);grid-template-rows:48px 1fr;height:100dvh}
+.top{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--line);background:#0e0e10}
+.top .brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-weight:700}
+.top .mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(120deg,#ec4899,#a855f7,#38bdf8);display:grid;place-items:center;font-size:13px}
+.top .crumb{color:var(--muted);font-size:13px}.top .sp{flex:1}
+.ib{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink)}
+.ib:hover{border-color:#3f3f46}.ib[aria-pressed=true]{border-color:var(--accent);background:#24163a}.ib[disabled]{opacity:.45;cursor:not-allowed}
+.mobile{display:none}
+.ib,.top .brand{white-space:nowrap}
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.side .new{margin:10px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--soft);cursor:pointer;font-weight:600;text-align:left}
+.side .new:hover{border-color:var(--accent)}
+.side h2{font-size:11px;letter-spacing:.08em;color:var(--muted);margin:6px 14px 4px;font-weight:700}
+.chats{flex:1;overflow:auto;padding:0 6px 8px}
+.chat{display:flex;align-items:center;gap:6px;border-radius:8px;padding:7px 8px;cursor:pointer;color:#d4d4d8}
+.chat:hover{background:#1a1a1e}.chat[aria-current=true]{background:#232329;color:var(--ink)}
+.chat .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat .v{font-size:11px;color:var(--muted)}
+.chat .x{opacity:0;background:none;border:0;cursor:pointer;color:var(--muted);padding:0 4px}
+.chat:hover .x,.chat .x:focus{opacity:1}
+.usage{border-top:1px solid var(--line);padding:10px 12px;font-size:12px;color:var(--muted);display:grid;gap:6px}
+.usage b{color:var(--ink)}
+.main{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+.thread{flex:1;overflow:auto;padding:18px 18px 8px;display:flex;flex-direction:column;gap:14px}
+.empty{margin:auto;max-width:440px;text-align:center;color:var(--muted)}
+.empty h1{color:var(--ink);font-size:22px;margin:0 0 6px}
+.ideas{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.ideas button{background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:6px 11px;cursor:pointer;font-size:13px}
+.msg-u{align-self:flex-end;max-width:85%;background:#26262c;border-radius:14px 14px 4px 14px;padding:9px 13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg-a{max-width:100%;display:grid;gap:6px}
+.step{border:1px solid var(--line);background:var(--panel);border-radius:10px}
+.step>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:13px}
+.step>summary::-webkit-details-marker{display:none}
+.step .ic{width:16px;height:16px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:800}
+.st-run .ic{border:2px solid #3f3f46;border-top-color:var(--accent);animation:spin .8s linear infinite}
+.st-ok .ic{background:#064e3b;color:var(--ok)}.st-warn .ic{background:#451a03;color:var(--warn)}.st-err .ic{background:#450a0a;color:var(--err)}
+.step .lbl{flex:1;min-width:0}.step .meta{color:var(--muted);font-size:12px;white-space:nowrap}
+.step .det{padding:2px 12px 10px 34px;color:#d4d4d8;font-size:13px;overflow-wrap:anywhere}
+.det p{margin:.4em 0}.det ul{margin:.3em 0;padding-left:1.1em}.det h4{margin:.6em 0 .2em;font-size:13px}
+.minis{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+.mini{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)}
+.mini.ok{color:var(--ink);border-color:var(--c)}.mini.err{color:var(--err);border-color:#7f1d1d}
+.spec{border-left:3px solid var(--c);padding-left:8px;margin:8px 0}
+.spec b{color:var(--c);font-size:11px;letter-spacing:.08em}
+.actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.composer{border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:grid;gap:8px;background:#0e0e10}
+.composer textarea{width:100%;min-height:52px;max-height:180px;resize:vertical;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.crow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.crow select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.send{margin-left:auto;background:linear-gradient(100deg,#ec4899,#a855f7,#38bdf8);border:0;border-radius:10px;padding:8px 16px;font-weight:700;cursor:pointer;color:#fff}
+.send[disabled]{opacity:.5;cursor:not-allowed}
+.pop{position:relative}
+.pop .menu{position:absolute;bottom:calc(100% + 6px);left:0;z-index:15;background:#18181b;border:1px solid var(--line);border-radius:12px;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;width:280px;box-shadow:0 12px 30px #000a}
+.pop .menu[hidden]{display:none}
+.pop .menu label{display:flex;gap:6px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px}
+.pop .menu label:hover{background:#232329}
+#sugwrap{display:grid;gap:6px}
+#sugmeta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);min-height:16px;opacity:0;transition:opacity .5s ease}
+#sugwrap.has #sugmeta,#sugwrap.thinking #sugmeta{opacity:1}
+#sugmeta .pulse{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle,#e9d5ff,#a855f7);box-shadow:0 0 0 0 #a855f799}
+#sugwrap.thinking .pulse{animation:evo 1.6s ease-out infinite}
+#sugwrap.has:not(.thinking) .pulse{animation:evo 3.2s ease-out 1}
+@keyframes evo{0%{box-shadow:0 0 0 0 #a855f799;transform:scale(.9)}50%{transform:scale(1.15)}100%{box-shadow:0 0 0 12px #a855f700;transform:scale(1)}}
+#sugmeta button{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:11px;padding:0}
+#sugs{display:flex;gap:6px;flex-wrap:wrap;transition:opacity .45s ease,transform .45s ease}
+#sugs.leaving{opacity:0;transform:translateY(4px)}
+#sugs button{background:#17131f;border:1px solid #3b2a55;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:#e9d5ff;text-align:left;opacity:0;transform:translateY(6px) scale(.98);animation:sugIn .55s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i) * 110ms)}
+#sugs button:hover{border-color:var(--accent);box-shadow:0 0 14px #a855f744}
+@keyframes sugIn{to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){#sugs button{animation:none;opacity:1;transform:none}#sugwrap .pulse{animation:none!important}#sugs,#sugmeta{transition:none}}
+.score{font-weight:800}.sev-high{color:var(--err)}.sev-medium{color:var(--warn)}.sev-low{color:var(--muted)}
+.backup{display:flex;gap:6px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.panel{display:flex;flex-direction:column;min-height:0;background:#0e0e10}
+.pbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pbar select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.pbar .sp{flex:1}
+.deploy{background:#2563eb;border-color:#2563eb;color:#fff}
+.pbody{flex:1;min-height:0;position:relative}
+.frame{width:100%;height:100%;border:0;background:#fff;display:block}
+.code{position:absolute;inset:0;margin:0;overflow:auto;background:#0a0a0a;padding:12px;color:#d4d4d8;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.placeholder{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px}
+[hidden]{display:none!important}
+.shield{font-size:12px;color:var(--muted);padding:6px 10px;border-top:1px solid var(--line)}
+.full{position:fixed;inset:0;z-index:40;background:#000e;display:flex;flex-direction:column;padding:8px;gap:8px}.full iframe{flex:1;border:0;border-radius:8px;background:#fff}
+.logs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#0d0d0ff5;backdrop-filter:blur(10px);border-top:1px solid var(--line);transform:translateY(100%);transition:transform .25s ease;height:min(55vh,460px);display:flex;flex-direction:column;padding:10px 14px 14px;gap:8px;visibility:hidden}
+.logs.open{transform:none;visibility:visible}
+.smart{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}.smart b{color:var(--ink)}
+.entries{flex:1;overflow:auto;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#09090b}
+.entries div{display:grid;grid-template-columns:64px 50px 1fr;gap:8px}
+.lv-info{color:#93c5fd}.lv-ok{color:#86efac}.lv-warn{color:#fcd34d}.lv-error{color:#fca5a5}
+.toasts{position:fixed;right:14px;bottom:14px;z-index:50;display:grid;gap:8px;max-width:min(360px,calc(100vw - 28px))}
+.toast{background:#18181b;border:1px solid var(--line);border-left:4px solid var(--c,#a855f7);border-radius:10px;padding:9px 12px;box-shadow:0 10px 30px #000a;animation:pop .2s ease}
+@keyframes pop{from{transform:translateY(6px);opacity:0}}
+@media(max-width:1100px){.app{grid-template-columns:220px minmax(300px,1fr) minmax(320px,1fr)}}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .mobile{display:inline-block}.top .crumb,.top .home{display:none}.top{gap:6px;padding:0 8px}
+  .toasts{top:56px;bottom:auto}
+  .side{position:fixed;top:48px;bottom:0;left:0;width:min(280px,85vw);z-index:25;transform:translateX(-100%);transition:transform .2s;visibility:hidden}
+  .side.open{transform:none;box-shadow:0 0 40px #000;visibility:visible}
+  .main,.panel{grid-column:1;grid-row:2}
+  body[data-view=chat] .panel,body[data-view=app] .main{display:none}
+  .main{border-right:0}
+  .entries div{grid-template-columns:58px 1fr}.entries div span:nth-child(2){display:none}
+}
+@media(prefers-reduced-motion:reduce){.st-run .ic,.toast{animation:none}.logs,.side{transition:none}}
+</style>
+</head>
+<body data-view="chat">
+<a class="skip" href="#prompt">Skip to the prompt</a>
+<div class="app">
+<header class="top">
+  <button type="button" class="ib mobile" id="menuBtn" aria-label="Chats" aria-expanded="false">☰</button>
+  <a class="brand" href="../"><span class="mark" aria-hidden="true">✦</span>Fun with Claude</a>
+  <span class="crumb">/ App Generator</span>
+  <span class="sp"></span>
+  <button type="button" class="ib mobile" id="viewBtn">App ▸</button>
+  <button type="button" class="ib" id="logBtn" aria-expanded="false" aria-controls="logs">Activity</button>
+  <a class="ib home" href="/" style="text-decoration:none">Indexplora</a>
+</header>
+
+<nav class="side" id="side" aria-label="Chats">
+  <button type="button" class="new" id="newChat">＋ New app chat</button>
+  <h2>CHATS</h2>
+  <div class="chats" id="chats"></div>
+  <div class="usage"><div id="usage"></div>
+    <div class="backup"><button type="button" class="ib" id="expBtn">Export backup</button><button type="button" class="ib" id="impBtn">Import</button><input type="file" id="impFile" accept="application/json,.json" hidden></div>
+    <div>Save backups to iCloud Drive or any folder to keep your chats and logs.</div></div>
+</nav>
+
+<main class="main" id="main">
+  <div class="thread" id="thread" aria-live="polite"></div>
+  <form class="composer" id="composer">
+    <label for="prompt" class="skip">Describe an app or a change</label>
+    <textarea id="prompt" maxlength="3000" placeholder="Describe an app to build…"></textarea>
+    <div id="sugwrap"><div id="sugmeta"><span class="pulse" aria-hidden="true"></span><span id="sugtxt"></span><button type="button" id="memReset" hidden>reset memory</button></div>
+    <div id="sugs" aria-live="polite" aria-label="Suggestions"></div></div>
+    <div class="crow">
+      <select id="kind" aria-label="App type"><option value="app">Interactive app</option><option value="landing">Landing page</option><option value="dashboard">Dashboard</option><option value="tool">Calculator / tool</option><option value="game">Mini game</option><option value="form">Multi-step form</option><option value="assistant">AI-assistant style UI</option></select>
+      <select id="builders" aria-label="Parallel builders" title="How many builders write your app at the same time"><option value="20">20 builders</option><option value="12">12 builders</option><option value="8">8 builders</option><option value="4">4 builders</option><option value="0">1 builder (in parts)</option></select>
+      <div class="pop"><button type="button" class="ib" id="mindsBtn" aria-expanded="false" aria-haspopup="true">Minds 8/8 ▾</button><div class="menu" id="mindsMenu" hidden></div></div>
+      <button type="button" class="ib" id="sugBtn" aria-pressed="true" title="Live suggestions while you type">💡</button>
+      <button type="button" class="ib" id="evoBtn" aria-pressed="true" title="Review every build and automatically improve weak ones">Self-improve</button>
+      <button type="button" class="ib" id="stopBtn" hidden>■ Stop</button>
+      <button class="send" id="sendBtn" type="submit">Build</button>
+    </div>
+  </form>
+</main>
+
+<section class="panel" id="panel" aria-label="App">
+  <div class="pbar">
+    <select id="ver" aria-label="Version"></select>
+    <button type="button" class="ib" id="tPrev" aria-pressed="true">Preview</button>
+    <button type="button" class="ib" id="tCode" aria-pressed="false">Code</button>
+    <span class="sp"></span>
+    <button type="button" class="ib" id="bFull" title="Full screen" aria-label="Full screen">⤢</button>
+    <button type="button" class="ib" id="bCopy">Copy</button>
+    <button type="button" class="ib" id="bDl">Download</button>
+    <button type="button" class="ib" id="bShare" title="Share in the public Showcase">Share 🌍</button>
+    <button type="button" class="ib deploy" id="bDeploy">Deploy</button>
+  </div>
+  <div class="pbody">
+    <div class="placeholder" id="ph">Your app appears here as it's built.</div>
+    <iframe class="frame" id="frame" title="App preview" sandbox="allow-scripts allow-modals" referrerpolicy="no-referrer" hidden></iframe>
+    <pre class="code" id="code" hidden></pre>
+  </div>
+  <div class="shield">🛡️ Apps run in a locked sandbox: no network, cookies or access to your account. Fixed safety rules apply to every build.</div>
+</section>
+</div>
+
+<aside class="logs" id="logs" aria-label="Activity log">
+  <div class="crow"><b>Activity</b><span style="flex:1"></span>
+    <button type="button" class="ib" data-f="all" aria-pressed="true">All</button><button type="button" class="ib" data-f="warn" aria-pressed="false">Issues</button>
+    <button type="button" class="ib" id="logExport">Export</button><button type="button" class="ib" id="logClose">Close ▾</button></div>
+  <div class="smart" id="smart"></div>
+  <div class="entries" id="entries" role="log"></div>
+</aside>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+  const API = "/api/fun-with-claude/apps";
+  const SESSION_KEY = "sb-zncmwdqqdgselvrmghwc-auth-token";
+  const MAX_PARTS = 12;
+  const MINDS = [
+    { id: "strategist", name: "Strategist", color: "#38bdf8" }, { id: "scientist", name: "Scientist", color: "#34d399" },
+    { id: "skeptic", name: "Skeptic", color: "#f97316" },       { id: "creator", name: "Creator", color: "#ec4899" },
+    { id: "earner", name: "Earner", color: "#facc15" },         { id: "storyteller", name: "Storyteller", color: "#a78bfa" },
+    { id: "designer", name: "Designer", color: "#2dd4bf" },     { id: "futurist", name: "Futurist", color: "#f43f5e" },
+  ];
+  const KIND_LABEL = { app: "Interactive app", landing: "Landing page", dashboard: "Dashboard", tool: "Calculator / tool", game: "Mini game", form: "Multi-step form", assistant: "AI-assistant style UI" };
+  const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
+  const IDEAS = ["A habit tracker with streaks and a weekly chart", "A budgeting calculator for a family trip", "A memory card game with emoji", "A landing page for a community garden", "A recipe scaler with unit conversion"];
+  const $ = (id) => document.getElementById(id);
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } } };
+
+  // ---------- state ----------
+  let chats = []; try { chats = JSON.parse(store.get("fwc.chats") || "[]"); } catch {}
+  if (!Array.isArray(chats)) chats = [];
+  let activeId = chats[0]?.id || null;
+  let shownVersion = null, view = "preview", busy = false, controller = null;
+  const usage = { calls: 0, tokens: 0, approx: 0 };
+  const active = () => chats.find((c) => c.id === activeId) || null;
+  function save() {
+    chats.sort((a, b) => b.updated - a.updated);
+    chats = chats.slice(0, 20);
+    for (const c of chats) c.versions = c.versions.slice(-5);
+    if (store.set("fwc.chats", JSON.stringify(chats))) return;
+    let copy = chats.map((c) => Object.assign({}, c, { versions: c.versions.slice(-1) })); // storage full: keep latest version only
+    while (copy.length && !store.set("fwc.chats", JSON.stringify(copy))) copy = copy.slice(0, -1);
+  }
+  function newChat(title, kind) {
+    const c = { id: Math.random().toString(36).slice(2, 10), title: title || "New app", kind: kind || "app", updated: Date.now(), blueprint: "", messages: [], versions: [] };
+    chats.unshift(c); activeId = c.id; shownVersion = null; save(); return c;
+  }
+
+  // ---------- helpers ----------
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function md(src) {
+    const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    let out = "", list = false;
+    for (const line of String(src).split("\n")) {
+      const m = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)/);
+      if (m) { if (!list) { out += "<ul>"; list = true; } out += `<li>${inline(m[1])}</li>`; continue; }
+      if (list) { out += "</ul>"; list = false; }
+      const h = line.match(/^#{1,6}\s+(.*)/);
+      if (h) out += `<h4>${inline(h[1])}</h4>`; else if (line.trim()) out += `<p>${inline(line)}</p>`;
+    }
+    return out + (list ? "</ul>" : "");
+  }
+  const secs = (ms) => (ms / 1000).toFixed(1) + "s";
+  function token() {
+    try { const raw = JSON.parse(store.get(SESSION_KEY) || "null"); const s = raw?.currentSession ?? raw;
+      if (s?.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) return s.access_token; } catch {}
+    return null;
+  }
+  const headers = () => { const t = token(); return Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}); };
+  async function errorFrom(res) {
+    let d = {}; try { d = await res.json(); } catch {}
+    const e = new Error(d.message || (res.status === 429 ? "Too many requests: wait a moment and try again." : res.status === 404 ? "The generator isn't deployed on this site yet." : "Request failed (" + res.status + ")."));
+    e.code = d.error || res.status; return e;
+  }
+  async function api(payload) {
+    usage.calls++; renderUsage();
+    // Every request also has its own 45s safety timeout (the server always answers within ~30s),
+    // so a request that never answers fails cleanly instead of hanging the run.
+    const signal = AbortSignal.any && AbortSignal.timeout ? AbortSignal.any([controller.signal, AbortSignal.timeout(45000)]) : controller.signal;
+    let res;
+    try { res = await fetch(API, { method: "POST", headers: headers(), signal, body: JSON.stringify(payload) }); }
+    catch (e) { if (e.name === "TimeoutError" || (e.name === "AbortError" && !controller.signal.aborted)) throw Object.assign(new Error("The request took too long. Please try again."), { code: "timeout" }); throw e; }
+    if (!res.ok) throw await errorFrom(res);
+    return res;
+  }
+  function extractHtml(raw) {
+    let s = raw.replace(/^\s*```(?:html)?\s*/i, "").replace(/```\s*$/, "");
+    const a = s.search(/<!doctype html|<html[\s>]/i); if (a > 0) s = s.slice(a);
+    const z = s.toLowerCase().lastIndexOf("</html>"); if (z >= 0) s = s.slice(0, z + 7);
+    return s.trim();
+  }
+  // Reports runtime errors and blocked requests from the preview to this page (used by the quality check).
+  const REPORTER = `<script>(function(){function s(m){try{parent.postMessage({fwcErr:String(m).slice(0,300)},"*")}catch(e){}}addEventListener("error",function(e){s((e.message||"Error")+(e.lineno?" (line "+e.lineno+")":""))});addEventListener("unhandledrejection",function(e){s("Unhandled promise rejection: "+((e.reason&&e.reason.message)||e.reason))});addEventListener("securitypolicyviolation",function(e){s("Blocked by the sandbox: "+(e.blockedURI||e.violatedDirective))});var ce=console.error;console.error=function(){s("console.error: "+[].map.call(arguments,String).join(" "));return ce.apply(console,arguments)}})();<\/script>`;
+  function lockDown(html, report) {
+    const head = CSP + (report ? REPORTER : "");
+    const h = html.match(/<head[^>]*>/i); if (h) return html.replace(h[0], h[0] + head);
+    const d = html.match(/<!doctype[^>]*>/i); return d ? html.replace(d[0], d[0] + head) : head + html;
+  }
+  const runtimeErrors = {};
+  window.addEventListener("message", (e) => {
+    const f = $("frame"); if (!f || e.source !== f.contentWindow || !e.data || typeof e.data.fwcErr !== "string") return;
+    const k = f.dataset.v; (runtimeErrors[k] = runtimeErrors[k] || []).push(e.data.fwcErr);
+    if (runtimeErrors[k].length <= 5) log("warn", "Runtime: " + e.data.fwcErr);
+  });
+  // Static checks against the industry-standard bar (fast, no AI needed).
+  function lint(html) {
+    const out = [], low = html.toLowerCase();
+    if (!/<title>[^<]+<\/title>/i.test(html)) out.push("Missing <title>");
+    if (!/<html[^>]*\slang=/i.test(html)) out.push("Missing lang attribute on <html>");
+    if (!/name=["']?viewport/i.test(html)) out.push("Missing viewport meta tag (mobile layout)");
+    const imgs = html.match(/<img\b[^>]*>/gi) || []; const noAlt = imgs.filter((t) => !/\balt=/i.test(t)).length;
+    if (noAlt) out.push(noAlt + " image(s) without alt text");
+    const inputs = (html.match(/<(input|select|textarea)\b(?![^>]*type=["']?(hidden|submit|button))[^>]*>/gi) || []).length;
+    const labels = (html.match(/<label\b/gi) || []).length + (html.match(/aria-label(ledby)?=/gi) || []).length;
+    if (inputs > labels) out.push(`${inputs - labels} form field(s) may be missing labels`);
+    if (/(src|href)=["']https?:\/\//i.test(html)) out.push("Loads external files, which the sandbox blocks: inline them instead");
+    if ((low.match(/<div[^>]+onclick=/g) || []).length) out.push("Clickable <div>s: use <button> for keyboard access");
+    if (!/prefers-reduced-motion/i.test(html) && /(animation|transition)\s*:/i.test(html)) out.push("Animations without a prefers-reduced-motion fallback");
+    if (!/:focus/i.test(html)) out.push("No custom focus styles");
+    return out;
+  }
+  function download(name, text, type) {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+    document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  const slug = (s) => (String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "app");
+  function toast(msg, color) { const t = document.createElement("div"); t.className = "toast"; t.style.setProperty("--c", color || "#a855f7"); t.textContent = msg; $("toasts").append(t); setTimeout(() => t.remove(), 4200); }
+
+  // ---------- activity log ----------
+  const LOG = []; let filter = "all"; const stats = { runs: 0, ok: 0, failed: 0, mindMs: [], buildMs: [], parts: 0, errors: {} };
+  function log(level, msg, ms) {
+    LOG.push({ t: new Date(), level, msg, ms }); if (LOG.length > 600) LOG.shift();
+    if (level === "error" || level === "warn") { const k = msg.includes(": ") ? msg.slice(msg.indexOf(": ") + 2) : msg; stats.errors[k] = (stats.errors[k] || 0) + 1; }
+    if ($("logs").classList.contains("open")) renderLog();
+    $("logBtn").textContent = "Activity" + (Object.keys(stats.errors).length ? " ⚠" : "");
+  }
+  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+  function renderLog() {
+    const rows = LOG.filter((e) => filter === "all" || e.level === "warn" || e.level === "error").slice(-250);
+    $("entries").innerHTML = rows.map((e) => `<div><span>${e.t.toLocaleTimeString([], { hour12: false })}</span><span class="lv-${e.level}">${e.level.toUpperCase()}</span><span>${esc(e.msg)}${e.ms != null ? " (" + secs(e.ms) + ")" : ""}</span></div>`).join("");
+    $("entries").scrollTop = $("entries").scrollHeight;
+    let s = !stats.runs ? "No activity yet." : `<b>${stats.runs}</b> run${stats.runs > 1 ? "s" : ""}: <b>${stats.ok}</b> built, <b>${stats.failed}</b> not built.`;
+    if (stats.mindMs.length) s += ` Minds answer in <b>${secs(avg(stats.mindMs))}</b> on average.`;
+    if (stats.buildMs.length) s += ` Builds take <b>${secs(avg(stats.buildMs))}</b>.`;
+    if (stats.parts) s += ` <b>${stats.parts}</b> large build${stats.parts > 1 ? "s were" : " was"} completed in extra parts.`;
+    const top = Object.entries(stats.errors).sort((a, b) => b[1] - a[1])[0];
+    if (top) s += ` Most common issue: <b>${esc(top[0])}</b> (×${top[1]}). ` + (/busy|Too many/i.test(top[0]) ? "Wait a moment between runs or use fewer minds." : /sign in/i.test(top[0]) ? "Sign in to Indexplora and try again." : "Try again; export the log if it repeats.");
+    $("smart").innerHTML = s;
+  }
+  function setLogs(open) { $("logs").classList.toggle("open", open); $("logBtn").setAttribute("aria-expanded", open); if (open) renderLog(); }
+  $("logBtn").onclick = () => setLogs(!$("logs").classList.contains("open"));
+  $("logClose").onclick = () => setLogs(false);
+  document.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll("[data-f]").forEach((x) => x.setAttribute("aria-pressed", x === b)); renderLog(); });
+  $("logExport").onclick = () => download("fun-with-claude-activity.json", JSON.stringify({ exported: new Date().toISOString(), usage, stats, events: LOG }, null, 2), "application/json");
+
+  // ---------- usage (shown openly) ----------
+  function renderUsage() {
+    $("usage").innerHTML = `<div>This session: <b>${usage.calls}</b> Claude call${usage.calls === 1 ? "" : "s"} · <b>${(usage.tokens + usage.approx).toLocaleString()}</b> tokens${usage.approx ? " (≈)" : ""}</div><div>No per-visitor limit. Your Netlify plan's AI credits still apply. Apps run in your browser.</div>`;
+  }
+
+  // ---------- minds picker ----------
+  let picked = null; try { picked = JSON.parse(store.get("fwc.app.minds") || "null"); } catch {}
+  if (!Array.isArray(picked)) picked = MINDS.map((m) => m.id);
+  $("mindsMenu").innerHTML = MINDS.map((m) => `<label style="--c:${m.color}"><input type="checkbox" value="${m.id}" ${picked.includes(m.id) ? "checked" : ""}><span class="dot"></span>${m.name}</label>`).join("");
+  const selected = () => [...$("mindsMenu").querySelectorAll("input:checked")].map((i) => i.value);
+  const mindsLabel = () => { $("mindsBtn").textContent = `Minds ${selected().length}/8 ▾`; };
+  mindsLabel();
+  $("mindsMenu").addEventListener("change", () => { store.set("fwc.app.minds", JSON.stringify(selected())); mindsLabel(); });
+  $("mindsBtn").onclick = () => { const o = $("mindsMenu").hidden; $("mindsMenu").hidden = !o; $("mindsBtn").setAttribute("aria-expanded", o); };
+  document.addEventListener("click", (e) => { if (!e.target.closest(".pop")) { $("mindsMenu").hidden = true; $("mindsBtn").setAttribute("aria-expanded", "false"); } });
+
+  // ---------- rendering ----------
+  function renderChats() {
+    $("chats").innerHTML = "";
+    if (!chats.length) $("chats").innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px">No chats yet.</div>';
+    for (const c of chats) {
+      const d = document.createElement("div"); d.className = "chat"; d.setAttribute("aria-current", c.id === activeId); d.tabIndex = 0; d.setAttribute("role", "button");
+      d.innerHTML = `<span class="t"></span><span class="v">${c.versions.length ? "v" + c.versions[c.versions.length - 1].n : ""}</span><button type="button" class="x" aria-label="Delete chat">✕</button>`;
+      d.querySelector(".t").textContent = c.title;
+      d.onclick = (e) => { if (e.target.closest(".x")) return; if (busy) return toast("Wait for the current build to finish", "#f59e0b"); activeId = c.id; shownVersion = null; renderAll(); closeSide(); };
+      d.onkeydown = (e) => { if (e.key === "Enter" && e.target === d) d.click(); };
+      d.querySelector(".x").onclick = () => {
+        if (busy) return toast("Wait for the current build to finish", "#f59e0b");
+        if (c.versions.length && !window.confirm(`Delete "${c.title}" and its ${c.versions.length} version(s)?`)) return;
+        chats = chats.filter((x) => x !== c); if (activeId === c.id) activeId = chats[0]?.id || null; save(); renderAll();
+      };
+      $("chats").append(d);
+    }
+  }
+  function stepHtml(s) {
+    const icon = { run: "", ok: "✓", warn: "!", err: "✕" }[s.state];
+    let det = "";
+    if (s.minis) det += `<div class="minis">${s.minis.map((m) => `<span class="mini ${m.state}" style="--c:${m.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${esc(m.name)}</span>`).join("")}</div>`;
+    if (s.minds) det += `<div class="minis">${s.minds.map((m) => { const mm = MINDS.find((x) => x.id === m.id); return `<span class="mini ${m.state}" style="--c:${mm.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${mm.name}</span>`; }).join("")}</div>`;
+    if (s.specs) det += s.specs.map((x) => { const mm = MINDS.find((m) => m.id === x.mind); return `<div class="spec" style="--c:${mm.color}"><b>${mm.name.toUpperCase()}</b>${md(x.text)}</div>`; }).join("");
+    if (s.review) {
+      const r = s.review;
+      det += `<p>${esc(r.summary)}</p>` + (r.issues.length ? "<ul>" + r.issues.map((i) => `<li><span class="sev-${i.severity}">${i.severity.toUpperCase()}</span> · ${esc(i.area)}: ${esc(i.note)}</li>`).join("") + "</ul>" : "<p>No issues found.</p>");
+    }
+    if (s.foresight) det += "<ul>" + s.foresight.map((f) => `<li>${f.level === "warning" ? "⚠️" : "ℹ️"} <b>${esc(f.affects)}</b>: ${esc(f.note)}</li>`).join("") + "</ul>";
+    if (s.text) det += md(s.text);
+    if (s.link) det += `<div class="actions"><a class="ib" href="${esc(s.link)}" target="_blank" rel="noopener" style="text-decoration:none">Open deployed app ↗</a><button type="button" class="ib" data-copy="${esc(s.link)}">Copy link</button></div>`;
+    if (s.version) det += `<div class="actions"><button type="button" class="ib" data-open="${s.version}">Open v${s.version}</button><button type="button" class="ib" data-deploy="${s.version}">Deploy v${s.version}</button><button type="button" class="ib" data-share="${s.version}">Share v${s.version} 🌍</button></div>`;
+    const open = s.open || s.state === "run" ? " open" : "";
+    return `<details class="step st-${s.state}"${open}><summary><span class="ic">${icon}</span><span class="lbl">${esc(s.label)}</span><span class="meta">${esc(s.meta || "")}</span></summary>${det ? `<div class="det">${det}</div>` : ""}</details>`;
+  }
+  function renderThread() {
+    const c = active();
+    if (!c || !c.messages.length) {
+      $("thread").innerHTML = `<div class="empty"><h1>What should we build?</h1><p>Describe an app. Eight Claude minds plan it, huddle on one shared blueprint, and the Conductor builds it. Keep chatting to refine it, then deploy a shareable link.</p><div class="ideas">${IDEAS.map((i) => `<button type="button" data-idea="${esc(i)}">${esc(i)}</button>`).join("")}</div></div>`;
+      return;
+    }
+    $("thread").innerHTML = c.messages.map((m) => m.role === "user" ? `<div class="msg-u">${esc(m.text)}</div>` : `<div class="msg-a">${m.steps.map(stepHtml).join("")}</div>`).join("");
+    $("thread").scrollTop = $("thread").scrollHeight;
+  }
+  let pending = 0;
+  function renderThreadSoon() { if (pending) return; pending = setTimeout(() => { pending = 0; renderThread(); }, 120); }
+  $("thread").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.idea) { $("prompt").value = b.dataset.idea; $("prompt").focus(); }
+    if (b.dataset.open) { shownVersion = +b.dataset.open; renderPanel(); setView("preview"); showApp(); }
+    if (b.dataset.deploy) deploy(+b.dataset.deploy);
+    if (b.dataset.share) share(+b.dataset.share);
+    if (b.dataset.copy) navigator.clipboard?.writeText(b.dataset.copy).then(() => toast("Link copied", "#34d399"));
+  });
+  function currentVersion() { const c = active(); if (!c || !c.versions.length) return null; return c.versions.find((v) => v.n === shownVersion) || c.versions[c.versions.length - 1]; }
+  function renderPanel(streamText) {
+    const c = active(), v = currentVersion();
+    $("ver").innerHTML = c && c.versions.length ? c.versions.map((x) => `<option value="${x.n}" ${v && x.n === v.n ? "selected" : ""}>v${x.n}</option>`).join("") : "<option>No versions yet</option>";
+    ["bFull", "bCopy", "bDl", "bDeploy", "bShare", "ver"].forEach((id) => ($(id).disabled = !v || streamText != null));
+    if (streamText != null) { $("ph").hidden = true; $("code").textContent = streamText; showPane("code"); $("code").scrollTop = $("code").scrollHeight; return; }
+    $("ph").hidden = !!v; $("code").textContent = v ? v.html : "";
+    if (v && $("frame").dataset.v !== c.id + ":" + v.n) loadFrame(lockDown(v.html, true), c.id + ":" + v.n);
+    if (!v && $("frame").dataset.v) loadFrame(null, "");
+    showPane(v ? view : null);
+  }
+  // A fresh frame per version: reusing a frame that was hidden while its content changed can leave it blank.
+  function loadFrame(doc, key) {
+    const old = $("frame"), f = old.cloneNode(false);
+    f.removeAttribute("srcdoc"); f.dataset.v = key; if (doc != null) f.srcdoc = doc;
+    old.replaceWith(f);
+  }
+  function showPane(p) {
+    $("tPrev").setAttribute("aria-pressed", p === "preview"); $("tCode").setAttribute("aria-pressed", p === "code");
+    $("frame").hidden = p !== "preview"; $("code").hidden = p !== "code";
+  }
+  function setView(v) { view = v; if (currentVersion()) showPane(v); }
+  function renderAll() { renderChats(); renderThread(); renderPanel(); syncComposer(); }
+  function syncComposer() {
+    const has = !!active()?.versions.length;
+    $("sendBtn").textContent = has ? "Refine" : "Build";
+    $("prompt").placeholder = has ? "Describe a change, e.g. add dark mode and a reset button…" : "Describe an app to build…";
+  }
+  $("ver").onchange = () => { shownVersion = +$("ver").value; renderPanel(); };
+  $("tPrev").onclick = () => setView("preview"); $("tCode").onclick = () => setView("code");
+  $("bCopy").onclick = () => { const v = currentVersion(); v && navigator.clipboard?.writeText(v.html).then(() => toast("Code copied", "#34d399"), () => toast("Couldn't copy", "#f59e0b")); };
+  $("bDl").onclick = () => { const v = currentVersion(); v && download(slug(active().title) + "-v" + v.n + ".html", v.html, "text/html"); };
+  $("bDeploy").onclick = () => { const v = currentVersion(); v && deploy(v.n); };
+  $("bShare").onclick = () => { const v = currentVersion(); v && share(v.n); };
+  $("bFull").onclick = () => {
+    const v = currentVersion(); if (!v) return;
+    const w = document.createElement("div"); w.className = "full";
+    w.innerHTML = `<div class="crow"><b></b><span style="flex:1"></span><button type="button" class="ib">Close ✕</button></div><iframe sandbox="allow-scripts allow-modals" title="App, full screen"></iframe>`;
+    w.querySelector("b").textContent = active().title + " · v" + v.n; w.querySelector("iframe").srcdoc = lockDown(v.html);
+    const close = () => { w.remove(); document.removeEventListener("keydown", onKey); $("bFull").focus(); };
+    const onKey = (e) => e.key === "Escape" && close();
+    w.querySelector("button").onclick = close; document.addEventListener("keydown", onKey); document.body.append(w); w.querySelector("button").focus();
+  };
+
+  // ---------- mobile ----------
+  function closeSide() { $("side").classList.remove("open"); $("menuBtn").setAttribute("aria-expanded", "false"); }
+  $("menuBtn").onclick = () => { const o = $("side").classList.toggle("open"); $("menuBtn").setAttribute("aria-expanded", o); };
+  function showApp() { document.body.dataset.view = "app"; $("viewBtn").textContent = "◂ Chat"; }
+  function showChat() { document.body.dataset.view = "chat"; $("viewBtn").textContent = "App ▸"; }
+  $("viewBtn").onclick = () => (document.body.dataset.view === "chat" ? showApp() : showChat());
+
+  // ---------- share in the public Showcase (after a safety check) ----------
+  async function share(n) {
+    const c = active(), v = c?.versions.find((x) => x.n === n); if (!v || busy) return;
+    const step = { label: `Sharing v${n} in the public Showcase: safety check…`, state: "run" };
+    c.messages.push({ role: "assistant", steps: [step] }); renderThread(); showChat();
+    try {
+      usage.calls++; renderUsage();
+      const res = await fetch(API, { method: "POST", headers: headers(), body: JSON.stringify({ mode: "showcase_publish", title: c.title, kind: c.kind, html: v.html }) });
+      if (!res.ok) throw await errorFrom(res);
+      const r = await res.json();
+      try { const mine = JSON.parse(store.get("fwc.showcase.mine") || "[]"); mine.unshift({ id: r.id, ownerKey: r.ownerKey, title: c.title }); store.set("fwc.showcase.mine", JSON.stringify(mine.slice(0, 50))); } catch {}
+      const link = new URL("../view/", location.href).href + "#s=" + r.id;
+      Object.assign(step, { label: `Shared v${n} in the public Showcase`, state: "ok", link, open: true, text: "Passed the all-ages safety check. Anyone can now find it in the public Showcase, open it and remix it." });
+      log("ok", `Shared v${n} in the Showcase`); toast("Shared in the public Showcase 🌍", "#34d399");
+    } catch (e) {
+      Object.assign(step, { label: `Couldn't share v${n}`, state: "err", text: e.message, open: true }); log("error", "Share: " + e.message);
+    }
+    c.updated = Date.now(); save(); renderAll();
+  }
+
+  // ---------- deploy: a shareable link; the app travels inside the link, nothing stored on a server ----------
+  async function deploy(n) {
+    const c = active(), v = c?.versions.find((x) => x.n === n); if (!v) return;
+    const step = { label: `Deploying v${n}`, state: "run" };
+    c.messages.push({ role: "assistant", steps: [step] }); renderThread(); showChat();
+    try {
+      const packed = await new Response(new Blob([v.html]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer();
+      let bin = ""; const bytes = new Uint8Array(packed); for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      const b64 = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const link = new URL("../view/", location.href).href + "#t=" + encodeURIComponent(c.title.slice(0, 60)) + "&app=" + b64;
+      Object.assign(step, { label: `Deployed v${n}`, state: "ok", meta: (link.length / 1024).toFixed(1) + " KB link", link, open: true, text: "Anyone with this link can open the app. It runs in the same locked sandbox, and nothing is stored on a server." });
+      log("ok", `Deployed v${n} as a ${(link.length / 1024).toFixed(1)} KB link`);
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => toast("Deployed: link copied", "#34d399"), () => toast("Deployed", "#34d399")); else toast("Deployed", "#34d399");
+    } catch (e) {
+      Object.assign(step, { label: `Couldn't deploy v${n}`, state: "err", text: "This browser can't create the link. Use Download instead." });
+      log("error", "Deploy: " + e.message);
+    }
+    c.updated = Date.now(); save(); renderAll();
+  }
+
+  // ---------- parallel builders ----------
+  const BCOLORS = ["#38bdf8", "#34d399", "#f97316", "#ec4899", "#facc15", "#a78bfa", "#2dd4bf", "#f43f5e", "#60a5fa", "#4ade80"];
+  try { const b = store.get("fwc.builders"); if (b != null && [...$("builders").options].some((o) => o.value === b)) $("builders").value = b; } catch {}
+  $("builders").onchange = () => store.set("fwc.builders", $("builders").value);
+  const featuresOf = (c) => (Array.isArray(c.features) ? c.features : (c.features = c.messages.filter((m) => m.role === "user").map((m) => m.text.split("  ·  ")[0])));
+
+  // Assembles the shell and every module into one app. Each module's script is isolated, so one
+  // broken module can't stop the others, and its error names the module for the quality check.
+  function assemble(shell, modules, results) {
+    let body = shell.html || "<main></main>";
+    const leftovers = [];
+    for (const m of modules) {
+      const r = results[m.id];
+      let html = r?.html || "";
+      if (html && !new RegExp(`id=["']m-${m.id}["']`).test(html)) html = `<section id="m-${m.id}" class="module">${html}</section>`;
+      const mark = `<!--MODULE:${m.id}-->`;
+      if (body.includes(mark)) body = body.split(mark).join(html); else if (html) leftovers.push(html);
+    }
+    body = body.replace(/<!--MODULE:[^>]*-->/g, "");
+    if (leftovers.length) body = /<\/main>/i.test(body) ? body.replace(/<\/main>/i, leftovers.join("\n") + "</main>") : body + leftovers.join("\n");
+    const css = [shell.css || "", ...modules.map((m) => results[m.id]?.css ? `/* ${m.id} */\n${results[m.id].css}` : "")].join("\n");
+    const js = modules.filter((m) => results[m.id]?.js).map((m) => `<script>/* module: ${m.id} */(function(){try{\n${results[m.id].js}\n}catch(e){console.error("Module ${m.id} failed: "+e.message)}})();<\/script>`).join("\n");
+    const title = esc(shell.title || "App");
+    return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${title}</title>\n<style>\n${css}\n</style>\n</head>\n<body>\n${body}\n<script>/* runtime */\n${shell.js || "window.App={}"}\n<\/script>\n${js}\n</body>\n</html>`;
+  }
+
+  // RAM split: the Architect divides the app into modules, then all builders work at the same time.
+  async function parallelBuild(c, steps, { text, blueprint, n, fixes, plan }) {
+    const label = fixes ? "Improving" : "Building";
+    let shell, modules;
+    if (plan) ({ shell, modules } = plan);
+    else {
+      const a = { label: `Architect: splitting the app into ${n} modules`, state: "run" }; steps.push(a); renderThreadSoon();
+      const s0 = performance.now();
+      let r;
+      try { r = await (await api({ mode: "architect", prompt: text, kind: c.kind, builders: n, blueprint, features: featuresOf(c) })).json(); }
+      catch (e) { if (e.name !== "AbortError") Object.assign(a, { label: "Architect couldn't plan the split", state: "err" }); throw e; }
+      shell = r.shell; modules = r.modules; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
+      Object.assign(a, { label: `Architect split "${shell.title || c.title}" into ${modules.length} modules`, state: "ok", meta: secs(performance.now() - s0), text: modules.map((m, i) => `${i + 1}. **${m.name}**: ${m.purpose}${m.listens?.length ? " (listens: " + m.listens.join(", ") + ")" : ""}`).join("\n") });
+      log("ok", `Architect planned ${modules.length} modules`, performance.now() - s0);
+    }
+    const n2 = (c.versions[c.versions.length - 1]?.n || 0) + 1;
+    const b = { label: `${modules.length} builders ${fixes ? "improving" : "writing"} v${n2} in parallel`, state: "run", minis: modules.map((m, i) => ({ id: m.id, name: m.name, color: BCOLORS[i % BCOLORS.length], state: "run" })) };
+    steps.push(b); renderThreadSoon();
+    const s1 = performance.now(), results = {};
+    let done = 0;
+    renderPanel(`/* ${modules.length} builders are writing their modules at the same time… */`);
+    await Promise.all(modules.map(async (m, i) => {
+      const mini = b.minis[i], t = performance.now();
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const r = await (await api({ mode: "module", prompt: text, kind: c.kind, features: featuresOf(c), module: m, shell, modules: modules.map(({ id, name, emits, listens }) => ({ id, name, emits, listens })), fixes: fixes || undefined, lite: attempt > 1 })).json();
+          results[m.id] = r; mini.state = "ok"; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
+          log("ok", `Builder ${i + 1} finished "${m.name}"`, performance.now() - t); break;
+        } catch (e) {
+          if (e.name === "AbortError") throw e;
+          if (attempt < 3 && /busy|Too many|429|502|503|504|reach|error/i.test(e.message + e.code)) { log("info", `Builder ${i + 1} retrying${attempt === 1 ? " with the lighter model" : ""}`); await wait(1200 * attempt + Math.random() * 1500); continue; }
+          mini.state = "err"; log("warn", `Builder ${i + 1} ("${m.name}"): ${e.message}`); break;
+        }
+      }
+      done++; b.meta = `${done}/${modules.length}`; renderPanel(`/* ${done} of ${modules.length} modules ready… */`); renderThreadSoon(); renderUsage();
+    }));
+    const ok = modules.filter((m) => results[m.id]).length;
+    if (!ok) { b.state = "err"; throw new Error("No builder could finish a module. Check Activity for details."); }
+    const html = assemble(shell, modules, results);
+    const ms = performance.now() - s1; stats.buildMs.push(ms);
+    const v = { n: n2, html, at: Date.now(), prompt: text, plan: { shell, modules } };
+    c.versions.push(v); c.blueprint = blueprint; c.updated = Date.now(); shownVersion = n2; view = "preview";
+    Object.assign(b, { label: `${label === "Building" ? "Built" : "Improved"} v${n2}: ${ok} of ${modules.length} modules assembled`, state: ok === modules.length ? "ok" : "warn", meta: `${html.length.toLocaleString()} chars · ${secs(ms)}`, version: n2, open: true });
+    log(ok === modules.length ? "ok" : "warn", `Assembled v${n2} from ${ok}/${modules.length} modules`, ms);
+    save(); renderAll();
+    return v;
+  }
+
+  // ---------- toggles ----------
+  const pref = (k, d) => { const v = store.get(k); return v == null ? d : v === "1"; };
+  let evolve = pref("fwc.evolve", true), suggestOn = pref("fwc.suggest", true);
+  function syncToggles() { $("evoBtn").setAttribute("aria-pressed", evolve); $("sugBtn").setAttribute("aria-pressed", suggestOn); $("sugwrap").hidden = !suggestOn; }
+  $("evoBtn").onclick = () => { evolve = !evolve; store.set("fwc.evolve", evolve ? "1" : "0"); syncToggles(); toast(evolve ? "Self-improve on: weak builds get one automatic improvement pass" : "Self-improve off", "#a855f7"); };
+  $("sugBtn").onclick = () => { suggestOn = !suggestOn; store.set("fwc.suggest", suggestOn ? "1" : "0"); syncToggles(); };
+  syncToggles();
+
+  // ---------- live suggestions under the prompt bar, evolving with the user's own history ----------
+  let sugTimer = 0, sugCtl = null, sugFor = "";
+  const memory = () => { try { const m = JSON.parse(store.get("fwc.memory") || "[]"); return Array.isArray(m) ? m : []; } catch { return []; } };
+  function remember(item) { const m = memory().filter((x) => x !== item); m.push(item.slice(0, 160)); store.set("fwc.memory", JSON.stringify(m.slice(-20))); syncMeta(); }
+  function syncMeta(thinking) {
+    const n = memory().length;
+    $("sugtxt").textContent = thinking ? "Evolving ideas from what you've made…" : n ? `Evolving with you · learned from ${n} idea${n === 1 ? "" : "s"}` : "Suggestions learn from what you build";
+    $("memReset").hidden = !n || !!thinking;
+  }
+  $("memReset").onclick = () => { store.set("fwc.memory", "[]"); syncMeta(); toast("Suggestion memory reset", "#a855f7"); };
+  function hideSugs() {
+    if (!$("sugs").children.length) { $("sugwrap").classList.remove("has", "thinking"); return; }
+    $("sugs").classList.add("leaving"); $("sugwrap").classList.remove("has");
+    setTimeout(() => { if ($("sugs").classList.contains("leaving")) { $("sugs").innerHTML = ""; $("sugs").classList.remove("leaving"); } }, 460);
+  }
+  function showSugs(list) {
+    $("sugs").classList.remove("leaving");
+    $("sugs").innerHTML = list.map((x, i) => `<button type="button" style="--i:${i}" data-sug="${esc(x)}">💡 ${esc(x)}</button>`).join("");
+    $("sugwrap").classList.toggle("has", list.length > 0);
+  }
+  $("prompt").addEventListener("input", () => {
+    clearTimeout(sugTimer); sugCtl?.abort(); $("sugwrap").classList.remove("thinking");
+    const t = $("prompt").value.trim();
+    if (!suggestOn || busy || t.length < 8) { hideSugs(); sugFor = ""; return; }
+    sugTimer = setTimeout(async () => {
+      if (t === sugFor) return; sugFor = t; sugCtl = new AbortController();
+      $("sugwrap").classList.add("thinking"); syncMeta(true);
+      try {
+        usage.calls++; renderUsage();
+        const c = active(), v = c?.versions[c.versions.length - 1];
+        const res = await fetch(API, { method: "POST", headers: headers(), signal: sugCtl.signal, body: JSON.stringify({ mode: "suggest", prompt: t, kind: c?.kind || $("kind").value, memory: memory().slice(-8), appSummary: v ? c.title + " (v" + v.n + "). " + (c.blueprint || "").slice(0, 400) : "" }) });
+        if (!res.ok) return;
+        const r = await res.json(); usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
+        if ($("prompt").value.trim() !== t) return;
+        showSugs(r.suggestions || []);
+      } catch {} finally { $("sugwrap").classList.remove("thinking"); syncMeta(); }
+    }, 900);
+  });
+  $("sugs").addEventListener("click", (e) => { const b = e.target.closest("[data-sug]"); if (!b) return; $("prompt").value = b.dataset.sug; remember("picked: " + b.dataset.sug); hideSugs(); sugFor = b.dataset.sug; $("prompt").focus(); });
+  syncMeta();
+
+  // ---------- backup (export / import) ----------
+  $("expBtn").onclick = () => { download(`fun-with-claude-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "fun-with-claude", version: 1, exported: new Date().toISOString(), chats, activity: LOG, stats }, null, 1), "application/json"); toast("Backup downloaded: save it to iCloud Drive or any folder", "#34d399"); log("info", "Exported a backup of " + chats.length + " chats"); };
+  $("impBtn").onclick = () => $("impFile").click();
+  $("impFile").onchange = async () => {
+    const f = $("impFile").files[0]; $("impFile").value = ""; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (data?.app !== "fun-with-claude" || !Array.isArray(data.chats)) throw new Error("not a Fun with Claude backup");
+      let added = 0;
+      for (const c of data.chats) {
+        if (!c || typeof c.id !== "string" || !Array.isArray(c.versions) || !Array.isArray(c.messages)) continue;
+        if (chats.some((x) => x.id === c.id)) continue;
+        chats.push({ id: c.id, title: String(c.title || "Imported app").slice(0, 80), kind: KIND_LABEL[c.kind] ? c.kind : "app", updated: +c.updated || Date.now(), blueprint: String(c.blueprint || ""), messages: c.messages, versions: c.versions.filter((v) => v && typeof v.html === "string" && Number.isFinite(+v.n)).map((v) => ({ n: +v.n, html: v.html, at: +v.at || Date.now(), prompt: String(v.prompt || "") })) });
+        added++;
+      }
+      if (!active() && chats.length) { chats.sort((x, y) => y.updated - x.updated); activeId = chats[0].id; shownVersion = null; }
+      save(); renderAll(); toast(`Imported ${added} chat${added === 1 ? "" : "s"}`, "#34d399"); log("ok", `Imported ${added} chats from a backup`);
+    } catch (e) { toast("Couldn't import: " + e.message, "#f87171"); log("error", "Import: " + e.message); }
+  };
+
+  // ---------- the workflow: plan → huddle → build → check & review → self-improve ----------
+  $("stopBtn").onclick = () => controller?.abort();
+  $("composer").addEventListener("submit", (e) => { e.preventDefault(); run(); });
+  $("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.innerWidth > 900) { e.preventDefault(); run(); } });
+  $("newChat").onclick = () => { if (busy) return toast("Wait for the current build to finish", "#f59e0b"); activeId = null; shownVersion = null; renderAll(); closeSide(); showChat(); $("prompt").focus(); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Streams one version from the Conductor, continuing in parts if needed. Returns the version.
+  async function buildVersion(c, steps, { text, specs, blueprint, base, fixes, label }) {
+    const n = (c.versions[c.versions.length - 1]?.n || 0) + 1;
+    const b = { label: `${label} v${n}`, state: "run", meta: "" }; steps.push(b); renderThreadSoon();
+    const s = performance.now(); let raw = "";
+    for (let part = 1; part <= MAX_PARTS; part++) {
+      if (part > 1) { b.label = `${label} v${n} · part ${part}`; log("info", `v${n} is large: continuing with part ${part}`); }
+      const before = raw.length;
+      try {
+        const res = await api(part === 1
+          ? { mode: "build", prompt: text, kind: c.kind, specs, blueprint, previousHtml: base ? base.html : "", fixes: fixes || "", features: featuresOf(c) }
+          : { mode: "continue", prompt: text, kind: c.kind, specs: [], blueprint, partialHtml: raw });
+        const reader = res.body.getReader(), dec = new TextDecoder(); let last = 0;
+        while (true) {
+          const { value, done } = await reader.read(); if (done) break;
+          raw += dec.decode(value, { stream: true });
+          if (performance.now() - last > 150) { b.meta = raw.length.toLocaleString() + " chars"; renderPanel(raw); renderThreadSoon(); last = performance.now(); }
+        }
+      } catch (e) {
+        if (e.name === "AbortError") throw e;
+        if (raw.length === before) { b.state = "err"; throw e; }
+        log("warn", `Part ${part} was cut off: ${e.message}`);
+      }
+      usage.approx += Math.round((raw.length - before) / 3.5); renderUsage();
+      if (/<\/html>\s*(```)?\s*$/i.test(raw.trim()) || raw.length === before) break;
+      if (part === 1) stats.parts++;
+    }
+    const html = extractHtml(raw);
+    if (!/<(body|div|main|section|canvas)/i.test(html)) { b.state = "err"; throw new Error("The build didn't return a usable app. Try again or simplify the request."); }
+    const complete = /<\/html>\s*$/i.test(html);
+    const v = { n, html: complete ? html : html + "\n</body></html>", at: Date.now(), prompt: text };
+    c.versions.push(v); c.blueprint = blueprint; c.updated = Date.now(); shownVersion = n; view = "preview";
+    const ms = performance.now() - s; stats.buildMs.push(ms);
+    Object.assign(b, { label: `${label === "Building" ? "Built" : "Improved"} v${n}${complete ? "" : " (may be incomplete)"}`, state: complete ? "ok" : "warn", meta: `${html.length.toLocaleString()} chars · ${secs(ms)}`, version: n, open: true });
+    log(complete ? "ok" : "warn", complete ? `Built v${n}` : `Build v${n}: ended before the app was finished`, ms);
+    save(); renderAll();
+    return v;
+  }
+
+  // Runs the app, collects runtime errors and lint, then asks the Reviewer for a score and foresight.
+  async function checkVersion(c, steps, v, text) {
+    const chk = { label: `Checking v${v.n}: runtime and lint`, state: "run" }; steps.push(chk); renderThreadSoon();
+    await wait(1800);
+    const key = c.id + ":" + v.n, errs = (runtimeErrors[key] || []).slice(0, 10), found = lint(v.html);
+    Object.assign(chk, { label: `Checked v${v.n}: ${errs.length} runtime error${errs.length === 1 ? "" : "s"}, ${found.length} lint finding${found.length === 1 ? "" : "s"}`, state: errs.length ? "warn" : "ok", text: [...errs.map((e) => "- Runtime: " + e), ...found.map((f) => "- Lint: " + f)].join("\n") || "No problems found." });
+    found.forEach((f) => log("warn", "Lint: " + f));
+    const rv = { label: `Reviewing v${v.n}: quality and foresight`, state: "run" }; steps.push(rv); renderThreadSoon();
+    try {
+      const r = await (await api({ mode: "review", prompt: text, kind: c.kind, html: v.html, runtimeErrors: errs, lint: found, features: featuresOf(c) })).json();
+      const review = r.review; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
+      Object.assign(rv, { label: `Quality review v${v.n}: ${review.score}/100`, state: review.score >= 85 ? "ok" : "warn", review, open: review.score < 85 });
+      v.score = review.score;
+      log(review.score >= 85 ? "ok" : "warn", `Review v${v.n}: score ${review.score}/100, ${review.issues.length} issues`);
+      if (review.foresight.length) {
+        const warnN = review.foresight.filter((f) => f.level === "warning").length;
+        steps.push({ label: `Foresight: ${warnN} warning${warnN === 1 ? "" : "s"}, ${review.foresight.length - warnN} note${review.foresight.length - warnN === 1 ? "" : "s"}`, state: warnN ? "warn" : "ok", foresight: review.foresight, open: !!warnN });
+        review.foresight.forEach((f) => log(f.level === "warning" ? "warn" : "info", `Foresight (${f.affects}): ${f.note}`));
+        if (warnN) toast(`Foresight: ${warnN} warning${warnN === 1 ? "" : "s"} for v${v.n}`, "#f59e0b");
+      }
+      return { review, errs, found };
+    } catch (e) {
+      if (e.name === "AbortError") throw e;
+      Object.assign(rv, { label: "Review unavailable", state: "warn", text: e.message }); log("warn", "Review: " + e.message);
+      return { review: null, errs, found };
+    } finally { renderThreadSoon(); }
+  }
+
+  async function run() {
+    if (busy) return;
+    const text = $("prompt").value.trim(); if (!text) return;
+    clearTimeout(sugTimer); sugCtl?.abort(); hideSugs(); remember(text);
+    const kind = $("kind").value, minds = selected();
+    let c = active();
+    if (!c) c = newChat(text.length > 48 ? text.slice(0, 46) + "…" : text, kind);
+    const refining = c.versions.length > 0;
+    const base = refining ? c.versions[c.versions.length - 1] : null;
+    featuresOf(c); c.features.push(text);
+    c.messages.push({ role: "user", text: refining ? text : text + "  ·  " + KIND_LABEL[kind] });
+    const steps = []; c.messages.push({ role: "assistant", steps });
+    $("prompt").value = ""; busy = true; controller = new AbortController();
+    $("sendBtn").disabled = true; $("stopBtn").hidden = false; renderAll();
+    stats.runs++; const t0 = performance.now();
+    log("info", `Run ${stats.runs} in "${c.title}": ${refining ? "refining v" + base.n : "new " + KIND_LABEL[kind]} with ${minds.length} minds${evolve ? ", self-improve on" : ""}`);
+    const fail = (label, err) => { steps.push({ label, state: "err", text: err, open: true }); log("error", label + ": " + err); stats.failed++; toast(err, "#f87171"); };
+    try {
+      // 1) minds plan in parallel
+      let specs = [];
+      if (minds.length) {
+        const plan = { label: `Planning with ${minds.length} mind${minds.length > 1 ? "s" : ""}`, state: "run", minds: minds.map((id) => ({ id, state: "run" })), specs: [] };
+        steps.push(plan); renderThreadSoon();
+        const s0 = performance.now();
+        await Promise.all(plan.minds.map(async (m) => {
+          const s = performance.now(); const name = MINDS.find((x) => x.id === m.id).name;
+          try {
+            const r = await (await api({ mode: "mind", mind: m.id, prompt: text, kind: c.kind, blueprint: c.blueprint, features: featuresOf(c) })).json();
+            m.state = "ok"; plan.specs.push({ mind: m.id, text: r.text }); usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
+            stats.mindMs.push(performance.now() - s); log("ok", `${name} planned`, performance.now() - s);
+          } catch (e) { m.state = "err"; if (e.name !== "AbortError") log(e.code === "authentication_required" ? "error" : "warn", `${name}: ${e.message}`); if (e.code === "authentication_required") plan.auth = true; }
+          renderThreadSoon(); renderUsage();
+        }));
+        specs = plan.specs.sort((a, b) => minds.indexOf(a.mind) - minds.indexOf(b.mind));
+        if (controller.signal.aborted) throw Object.assign(new Error("Stopped"), { name: "AbortError" });
+        plan.state = specs.length === minds.length ? "ok" : specs.length ? "warn" : "err";
+        plan.label = specs.length ? `Planned by ${specs.length} of ${minds.length} minds` : "Planning failed";
+        plan.meta = secs(performance.now() - s0);
+        if (!specs.length) { fail("Couldn't plan", plan.auth ? "Please sign in to Indexplora to use the generator." : "No mind could plan this. Check Activity for details."); return; }
+      }
+      // 2) huddle: merge the specs into one shared blueprint
+      let blueprint = c.blueprint || "";
+      if (specs.length > 1) {
+        const h = { label: "Huddle: merging ideas into one blueprint", state: "run" }; steps.push(h); renderThreadSoon();
+        const s = performance.now();
+        try {
+          const r = await (await api({ mode: "huddle", prompt: text, kind: c.kind, specs, blueprint: c.blueprint, features: featuresOf(c) })).json();
+          blueprint = r.blueprint; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
+          Object.assign(h, { label: "Shared blueprint agreed", state: "ok", meta: secs(performance.now() - s), text: blueprint });
+          log("ok", "Huddle agreed a blueprint", performance.now() - s);
+        } catch (e) {
+          if (e.name === "AbortError") throw e;
+          Object.assign(h, { label: "Huddle skipped: building from the specs directly", state: "warn", text: e.message }); log("warn", "Huddle: " + e.message);
+        }
+        renderThreadSoon(); renderUsage();
+      }
+      // 3) build: parallel builders (RAM split), falling back to one builder in parts
+      const nBuilders = +$("builders").value;
+      if (featuresOf(c).length > 1) steps.push({ label: `Feature ledger: ${featuresOf(c).length} features kept and connected`, state: "ok", text: featuresOf(c).map((f, i) => `${i + 1}. ${f}`).join("\n") });
+      let v;
+      try {
+        if (nBuilders > 0) {
+          try { v = await parallelBuild(c, steps, { text, blueprint, n: nBuilders }); }
+          catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Parallel build unavailable: switching to one builder", state: "warn", text: e.message }); log("warn", "Parallel build: " + e.message); }
+        }
+        if (!v) v = await buildVersion(c, steps, { text, specs, blueprint, base, label: "Building" });
+      } catch (e) { if (e.name === "AbortError") throw e; fail("Build failed", e.message); return; }
+      showApp();
+      // 4) check, review and foresee; 5) one automatic improvement pass if needed
+      if (evolve) {
+        const res = await checkVersion(c, steps, v, text);
+        const needs = res.errs.length || (res.review && res.review.score < 85);
+        if (needs) {
+          const fixes = [...res.errs.map((e) => "- Runtime error: " + e), ...(res.review?.issues || []).filter((i) => i.severity !== "low").map((i) => `- [${i.severity}] ${i.area}: ${i.note}`), ...(res.review?.foresight || []).filter((f) => f.level === "warning").map((f) => `- Foresight (${f.affects}): ${f.note}`), ...res.found.map((f) => "- Lint: " + f)].join("\n");
+          steps.push({ label: "Self-improving: fixing what the checks found", state: "ok", text: fixes });
+          log("info", `Self-improve: v${v.n} → v${v.n + 1}`);
+          try {
+            const v2 = v.plan ? await parallelBuild(c, steps, { text, blueprint, n: v.plan.modules.length, fixes, plan: v.plan }) : await buildVersion(c, steps, { text, specs: [], blueprint, base: v, fixes, label: "Improving" });
+            const res2 = await checkVersion(c, steps, v2, text);
+            if (res.review && res2.review) log(res2.review.score >= res.review.score ? "ok" : "warn", `Self-improve: score ${res.review.score} → ${res2.review.score}`);
+          } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + v.n, state: "warn", text: e.message }); log("warn", "Self-improve: " + e.message); }
+        }
+      }
+      stats.ok++; log("ok", `Run ${stats.runs} finished`, performance.now() - t0);
+      toast(`v${active().versions[active().versions.length - 1].n} is ready ✨`, "#34d399");
+    } catch (e) {
+      if (e.name === "AbortError") { steps.push({ label: "Stopped", state: "warn" }); log("warn", "Run stopped by you"); stats.failed++; }
+      else fail("Something went wrong", e.message);
+    } finally {
+      busy = false; controller = null; $("sendBtn").disabled = false; $("stopBtn").hidden = true;
+      for (const st of steps) if (st.state === "run") st.state = "warn";
+      c.updated = Date.now(); save(); renderAll(); renderUsage();
+    }
+  }
+
+  // ---------- start ----------
+  try {
+    if (location.hash === "#remix") {
+      const r = JSON.parse(sessionStorage.getItem("fwc.remix") || "null"); sessionStorage.removeItem("fwc.remix");
+      if (r?.html) { const c = newChat("Remix: " + String(r.title).slice(0, 40), "app"); c.versions.push({ n: 1, html: r.html, at: Date.now(), prompt: "Remixed from a shared link" }); c.messages.push({ role: "assistant", steps: [{ label: "Imported a shared app as v1", state: "ok", version: 1, open: true, text: "Describe a change to make it yours." }] }); save(); }
+      history.replaceState(null, "", location.pathname);
+    }
+  } catch {}
+  renderAll(); renderUsage(); renderLog();
+})();
+</script>
+</body>
+</html>

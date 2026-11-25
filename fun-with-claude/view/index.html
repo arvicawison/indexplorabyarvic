@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shared app | Fun with Claude | Indexplora</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="An app made with the Fun with Claude App Generator on Indexplora.">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+html,body{margin:0;height:100%;background:#0a0a0a;color:#fafafa;font:14px/1.4 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #222;flex-wrap:wrap}
+.bar b{font-size:14px}.bar small{color:#a3a3a3}
+.bar a{color:#38bdf8;text-decoration:none;font-weight:600}
+.bar button{background:#1c1c1c;border:1px solid #333;color:#fafafa;border-radius:8px;padding:6px 10px;font:600 12px/1 inherit;cursor:pointer}
+iframe{flex:1;width:100%;border:0;background:#fff}
+.msg{margin:auto;max-width:460px;text-align:center;color:#a3a3a3;padding:30px}
+</style>
+</head>
+<body>
+<div class="bar"><div><b id="title">Shared app</b> <small>· made with <a href="../app-generator/">Fun with Claude</a> · <a href="../showcase/">Showcase</a> · runs in a locked sandbox and can't send data anywhere</small></div>
+<div><button type="button" id="remix" hidden>Remix in the generator</button> <button type="button" id="dl" hidden>Download</button></div></div>
+<div id="out" class="msg">Opening the app…</div>
+<script>
+(async () => {
+  const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
+  const out = document.getElementById("out");
+  const fail = (m) => { out.textContent = m; };
+  try {
+    const params = new URLSearchParams(location.hash.slice(1));
+    let html, title;
+    if (params.get("s")) { // an app from the public Showcase
+      const res = await fetch("/api/fun-with-claude/apps", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "showcase_get", id: params.get("s") }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) return fail(d.message || "This app couldn't be loaded from the Showcase.");
+      html = d.app.html; title = String(d.app.title || "Shared app").slice(0, 80);
+    } else {
+      const data = params.get("app");
+      if (!data) return fail("This link doesn't contain an app. Ask the person who shared it for the full link.");
+      const bin = Uint8Array.from(atob(data.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+      html = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+      title = (params.get("t") || "Shared app").slice(0, 80);
+    }
+    document.getElementById("title").textContent = title; document.title = title + " | Fun with Claude";
+    const h = html.match(/<head[^>]*>/i), d = html.match(/<!doctype[^>]*>/i);
+    const locked = h ? html.replace(h[0], h[0] + CSP) : d ? html.replace(d[0], d[0] + CSP) : CSP + html;
+    const f = document.createElement("iframe");
+    f.setAttribute("sandbox", "allow-scripts allow-modals"); f.setAttribute("referrerpolicy", "no-referrer"); f.title = title;
+    f.srcdoc = locked; out.replaceWith(f);
+    const dl = document.getElementById("dl"); dl.hidden = false;
+    dl.onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" })); a.download = (title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app") + ".html"; a.click(); };
+    const remix = document.getElementById("remix"); remix.hidden = false;
+    remix.onclick = () => { try { sessionStorage.setItem("fwc.remix", JSON.stringify({ title, html })); } catch {} location.href = "../app-generator/#remix"; };
+  } catch (e) { fail("This link looks damaged or incomplete, so the app couldn't be opened."); }
+})();
+</script>
+</body>
+</html>
