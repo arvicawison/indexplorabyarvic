@@ -71,6 +71,11 @@ a{color:var(--blue)}
 .pop .menu[hidden]{display:none}
 .pop .menu label{display:flex;gap:6px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px}
 .pop .menu label:hover{background:#232329}
+#sugs{display:flex;gap:6px;flex-wrap:wrap;min-height:0}
+#sugs button{background:#17131f;border:1px solid #3b2a55;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:#e9d5ff;text-align:left}
+#sugs button:hover{border-color:var(--accent)}
+.score{font-weight:800}.sev-high{color:var(--err)}.sev-medium{color:var(--warn)}.sev-low{color:var(--muted)}
+.backup{display:flex;gap:6px;flex-wrap:wrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
 .panel{display:flex;flex-direction:column;min-height:0;background:#0e0e10}
 .pbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -125,7 +130,9 @@ a{color:var(--blue)}
   <button type="button" class="new" id="newChat">＋ New app chat</button>
   <h2>CHATS</h2>
   <div class="chats" id="chats"></div>
-  <div class="usage" id="usage"></div>
+  <div class="usage"><div id="usage"></div>
+    <div class="backup"><button type="button" class="ib" id="expBtn">Export backup</button><button type="button" class="ib" id="impBtn">Import</button><input type="file" id="impFile" accept="application/json,.json" hidden></div>
+    <div>Save backups to iCloud Drive or any folder to keep your chats and logs.</div></div>
 </nav>
 
 <main class="main" id="main">
@@ -133,9 +140,12 @@ a{color:var(--blue)}
   <form class="composer" id="composer">
     <label for="prompt" class="skip">Describe an app or a change</label>
     <textarea id="prompt" maxlength="3000" placeholder="Describe an app to build…"></textarea>
+    <div id="sugs" aria-live="polite" aria-label="Suggestions"></div>
     <div class="crow">
       <select id="kind" aria-label="App type"><option value="app">Interactive app</option><option value="landing">Landing page</option><option value="dashboard">Dashboard</option><option value="tool">Calculator / tool</option><option value="game">Mini game</option><option value="form">Multi-step form</option><option value="assistant">AI-assistant style UI</option></select>
       <div class="pop"><button type="button" class="ib" id="mindsBtn" aria-expanded="false" aria-haspopup="true">Minds 8/8 ▾</button><div class="menu" id="mindsMenu" hidden></div></div>
+      <button type="button" class="ib" id="sugBtn" aria-pressed="true" title="Live suggestions while you type">💡</button>
+      <button type="button" class="ib" id="evoBtn" aria-pressed="true" title="Review every build and automatically improve weak ones">Self-improve</button>
       <button type="button" class="ib" id="stopBtn" hidden>■ Stop</button>
       <button class="send" id="sendBtn" type="submit">Build</button>
     </div>
@@ -246,9 +256,35 @@ a{color:var(--blue)}
     const z = s.toLowerCase().lastIndexOf("</html>"); if (z >= 0) s = s.slice(0, z + 7);
     return s.trim();
   }
-  function lockDown(html) {
-    const h = html.match(/<head[^>]*>/i); if (h) return html.replace(h[0], h[0] + CSP);
-    const d = html.match(/<!doctype[^>]*>/i); return d ? html.replace(d[0], d[0] + CSP) : CSP + html;
+  // Reports runtime errors and blocked requests from the preview to this page (used by the quality check).
+  const REPORTER = `<script>(function(){function s(m){try{parent.postMessage({fwcErr:String(m).slice(0,300)},"*")}catch(e){}}addEventListener("error",function(e){s((e.message||"Error")+(e.lineno?" (line "+e.lineno+")":""))});addEventListener("unhandledrejection",function(e){s("Unhandled promise rejection: "+((e.reason&&e.reason.message)||e.reason))});addEventListener("securitypolicyviolation",function(e){s("Blocked by the sandbox: "+(e.blockedURI||e.violatedDirective))});var ce=console.error;console.error=function(){s("console.error: "+[].map.call(arguments,String).join(" "));return ce.apply(console,arguments)}})();<\/script>`;
+  function lockDown(html, report) {
+    const head = CSP + (report ? REPORTER : "");
+    const h = html.match(/<head[^>]*>/i); if (h) return html.replace(h[0], h[0] + head);
+    const d = html.match(/<!doctype[^>]*>/i); return d ? html.replace(d[0], d[0] + head) : head + html;
+  }
+  const runtimeErrors = {};
+  window.addEventListener("message", (e) => {
+    const f = $("frame"); if (!f || e.source !== f.contentWindow || !e.data || typeof e.data.fwcErr !== "string") return;
+    const k = f.dataset.v; (runtimeErrors[k] = runtimeErrors[k] || []).push(e.data.fwcErr);
+    if (runtimeErrors[k].length <= 5) log("warn", "Runtime: " + e.data.fwcErr);
+  });
+  // Static checks against the industry-standard bar (fast, no AI needed).
+  function lint(html) {
+    const out = [], low = html.toLowerCase();
+    if (!/<title>[^<]+<\/title>/i.test(html)) out.push("Missing <title>");
+    if (!/<html[^>]*\slang=/i.test(html)) out.push("Missing lang attribute on <html>");
+    if (!/name=["']?viewport/i.test(html)) out.push("Missing viewport meta tag (mobile layout)");
+    const imgs = html.match(/<img\b[^>]*>/gi) || []; const noAlt = imgs.filter((t) => !/\balt=/i.test(t)).length;
+    if (noAlt) out.push(noAlt + " image(s) without alt text");
+    const inputs = (html.match(/<(input|select|textarea)\b(?![^>]*type=["']?(hidden|submit|button))[^>]*>/gi) || []).length;
+    const labels = (html.match(/<label\b/gi) || []).length + (html.match(/aria-label(ledby)?=/gi) || []).length;
+    if (inputs > labels) out.push(`${inputs - labels} form field(s) may be missing labels`);
+    if (/(src|href)=["']https?:\/\//i.test(html)) out.push("Loads external files, which the sandbox blocks: inline them instead");
+    if ((low.match(/<div[^>]+onclick=/g) || []).length) out.push("Clickable <div>s: use <button> for keyboard access");
+    if (!/prefers-reduced-motion/i.test(html) && /(animation|transition)\s*:/i.test(html)) out.push("Animations without a prefers-reduced-motion fallback");
+    if (!/:focus/i.test(html)) out.push("No custom focus styles");
+    return out;
   }
   function download(name, text, type) {
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
@@ -323,6 +359,11 @@ a{color:var(--blue)}
     let det = "";
     if (s.minds) det += `<div class="minis">${s.minds.map((m) => { const mm = MINDS.find((x) => x.id === m.id); return `<span class="mini ${m.state}" style="--c:${mm.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${mm.name}</span>`; }).join("")}</div>`;
     if (s.specs) det += s.specs.map((x) => { const mm = MINDS.find((m) => m.id === x.mind); return `<div class="spec" style="--c:${mm.color}"><b>${mm.name.toUpperCase()}</b>${md(x.text)}</div>`; }).join("");
+    if (s.review) {
+      const r = s.review;
+      det += `<p>${esc(r.summary)}</p>` + (r.issues.length ? "<ul>" + r.issues.map((i) => `<li><span class="sev-${i.severity}">${i.severity.toUpperCase()}</span> · ${esc(i.area)}: ${esc(i.note)}</li>`).join("") + "</ul>" : "<p>No issues found.</p>");
+    }
+    if (s.foresight) det += "<ul>" + s.foresight.map((f) => `<li>${f.level === "warning" ? "⚠️" : "ℹ️"} <b>${esc(f.affects)}</b>: ${esc(f.note)}</li>`).join("") + "</ul>";
     if (s.text) det += md(s.text);
     if (s.link) det += `<div class="actions"><a class="ib" href="${esc(s.link)}" target="_blank" rel="noopener" style="text-decoration:none">Open deployed app ↗</a><button type="button" class="ib" data-copy="${esc(s.link)}">Copy link</button></div>`;
     if (s.version) det += `<div class="actions"><button type="button" class="ib" data-open="${s.version}">Open v${s.version}</button><button type="button" class="ib" data-deploy="${s.version}">Deploy v${s.version}</button></div>`;
@@ -354,7 +395,7 @@ a{color:var(--blue)}
     ["bFull", "bCopy", "bDl", "bDeploy", "ver"].forEach((id) => ($(id).disabled = !v || streamText != null));
     if (streamText != null) { $("ph").hidden = true; $("code").textContent = streamText; showPane("code"); $("code").scrollTop = $("code").scrollHeight; return; }
     $("ph").hidden = !!v; $("code").textContent = v ? v.html : "";
-    if (v && $("frame").dataset.v !== c.id + ":" + v.n) loadFrame(lockDown(v.html), c.id + ":" + v.n);
+    if (v && $("frame").dataset.v !== c.id + ":" + v.n) loadFrame(lockDown(v.html, true), c.id + ":" + v.n);
     if (!v && $("frame").dataset.v) loadFrame(null, "");
     showPane(v ? view : null);
   }
@@ -417,15 +458,133 @@ a{color:var(--blue)}
     c.updated = Date.now(); save(); renderAll();
   }
 
-  // ---------- the workflow: plan → huddle → build (in parts) ----------
+  // ---------- toggles ----------
+  const pref = (k, d) => { const v = store.get(k); return v == null ? d : v === "1"; };
+  let evolve = pref("fwc.evolve", true), suggestOn = pref("fwc.suggest", true);
+  function syncToggles() { $("evoBtn").setAttribute("aria-pressed", evolve); $("sugBtn").setAttribute("aria-pressed", suggestOn); if (!suggestOn) $("sugs").innerHTML = ""; }
+  $("evoBtn").onclick = () => { evolve = !evolve; store.set("fwc.evolve", evolve ? "1" : "0"); syncToggles(); toast(evolve ? "Self-improve on: weak builds get one automatic improvement pass" : "Self-improve off", "#a855f7"); };
+  $("sugBtn").onclick = () => { suggestOn = !suggestOn; store.set("fwc.suggest", suggestOn ? "1" : "0"); syncToggles(); };
+  syncToggles();
+
+  // ---------- live suggestions under the prompt bar ----------
+  let sugTimer = 0, sugCtl = null, sugFor = "";
+  $("prompt").addEventListener("input", () => {
+    clearTimeout(sugTimer); sugCtl?.abort();
+    const t = $("prompt").value.trim();
+    if (!suggestOn || busy || t.length < 8) { if (t.length < 8) $("sugs").innerHTML = ""; return; }
+    sugTimer = setTimeout(async () => {
+      if (t === sugFor) return; sugFor = t; sugCtl = new AbortController();
+      try {
+        usage.calls++; renderUsage();
+        const c = active(), v = c?.versions[c.versions.length - 1];
+        const res = await fetch(API, { method: "POST", headers: headers(), signal: sugCtl.signal, body: JSON.stringify({ mode: "suggest", prompt: t, kind: c?.kind || $("kind").value, appSummary: v ? c.title + " (v" + v.n + "). " + (c.blueprint || "").slice(0, 400) : "" }) });
+        if (!res.ok) return;
+        const r = await res.json(); usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
+        if ($("prompt").value.trim() !== t) return;
+        $("sugs").innerHTML = (r.suggestions || []).map((x) => `<button type="button" data-sug="${esc(x)}">💡 ${esc(x)}</button>`).join("");
+      } catch {}
+    }, 900);
+  });
+  $("sugs").addEventListener("click", (e) => { const b = e.target.closest("[data-sug]"); if (!b) return; $("prompt").value = b.dataset.sug; $("sugs").innerHTML = ""; sugFor = b.dataset.sug; $("prompt").focus(); });
+
+  // ---------- backup (export / import) ----------
+  $("expBtn").onclick = () => { download(`fun-with-claude-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "fun-with-claude", version: 1, exported: new Date().toISOString(), chats, activity: LOG, stats }, null, 1), "application/json"); toast("Backup downloaded: save it to iCloud Drive or any folder", "#34d399"); log("info", "Exported a backup of " + chats.length + " chats"); };
+  $("impBtn").onclick = () => $("impFile").click();
+  $("impFile").onchange = async () => {
+    const f = $("impFile").files[0]; $("impFile").value = ""; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (data?.app !== "fun-with-claude" || !Array.isArray(data.chats)) throw new Error("not a Fun with Claude backup");
+      let added = 0;
+      for (const c of data.chats) {
+        if (!c || typeof c.id !== "string" || !Array.isArray(c.versions) || !Array.isArray(c.messages)) continue;
+        if (chats.some((x) => x.id === c.id)) continue;
+        chats.push({ id: c.id, title: String(c.title || "Imported app").slice(0, 80), kind: KIND_LABEL[c.kind] ? c.kind : "app", updated: +c.updated || Date.now(), blueprint: String(c.blueprint || ""), messages: c.messages, versions: c.versions.filter((v) => v && typeof v.html === "string" && Number.isFinite(+v.n)).map((v) => ({ n: +v.n, html: v.html, at: +v.at || Date.now(), prompt: String(v.prompt || "") })) });
+        added++;
+      }
+      if (!active() && chats.length) { chats.sort((x, y) => y.updated - x.updated); activeId = chats[0].id; shownVersion = null; }
+      save(); renderAll(); toast(`Imported ${added} chat${added === 1 ? "" : "s"}`, "#34d399"); log("ok", `Imported ${added} chats from a backup`);
+    } catch (e) { toast("Couldn't import: " + e.message, "#f87171"); log("error", "Import: " + e.message); }
+  };
+
+  // ---------- the workflow: plan → huddle → build → check & review → self-improve ----------
   $("stopBtn").onclick = () => controller?.abort();
   $("composer").addEventListener("submit", (e) => { e.preventDefault(); run(); });
   $("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.innerWidth > 900) { e.preventDefault(); run(); } });
   $("newChat").onclick = () => { if (busy) return toast("Wait for the current build to finish", "#f59e0b"); activeId = null; shownVersion = null; renderAll(); closeSide(); showChat(); $("prompt").focus(); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Streams one version from the Conductor, continuing in parts if needed. Returns the version.
+  async function buildVersion(c, steps, { text, specs, blueprint, base, fixes, label }) {
+    const n = (c.versions[c.versions.length - 1]?.n || 0) + 1;
+    const b = { label: `${label} v${n}`, state: "run", meta: "" }; steps.push(b); renderThreadSoon();
+    const s = performance.now(); let raw = "";
+    for (let part = 1; part <= MAX_PARTS; part++) {
+      if (part > 1) { b.label = `${label} v${n} · part ${part}`; log("info", `v${n} is large: continuing with part ${part}`); }
+      const before = raw.length;
+      try {
+        const res = await api(part === 1
+          ? { mode: "build", prompt: text, kind: c.kind, specs, blueprint, previousHtml: base ? base.html : "", fixes: fixes || "" }
+          : { mode: "continue", prompt: text, kind: c.kind, specs: [], blueprint, partialHtml: raw });
+        const reader = res.body.getReader(), dec = new TextDecoder(); let last = 0;
+        while (true) {
+          const { value, done } = await reader.read(); if (done) break;
+          raw += dec.decode(value, { stream: true });
+          if (performance.now() - last > 150) { b.meta = raw.length.toLocaleString() + " chars"; renderPanel(raw); renderThreadSoon(); last = performance.now(); }
+        }
+      } catch (e) {
+        if (e.name === "AbortError") throw e;
+        if (raw.length === before) { b.state = "err"; throw e; }
+        log("warn", `Part ${part} was cut off: ${e.message}`);
+      }
+      usage.approx += Math.round((raw.length - before) / 3.5); renderUsage();
+      if (/<\/html>\s*(```)?\s*$/i.test(raw.trim()) || raw.length === before) break;
+      if (part === 1) stats.parts++;
+    }
+    const html = extractHtml(raw);
+    if (!/<(body|div|main|section|canvas)/i.test(html)) { b.state = "err"; throw new Error("The build didn't return a usable app. Try again or simplify the request."); }
+    const complete = /<\/html>\s*$/i.test(html);
+    const v = { n, html: complete ? html : html + "\n</body></html>", at: Date.now(), prompt: text };
+    c.versions.push(v); c.blueprint = blueprint; c.updated = Date.now(); shownVersion = n; view = "preview";
+    const ms = performance.now() - s; stats.buildMs.push(ms);
+    Object.assign(b, { label: `${label === "Building" ? "Built" : "Improved"} v${n}${complete ? "" : " (may be incomplete)"}`, state: complete ? "ok" : "warn", meta: `${html.length.toLocaleString()} chars · ${secs(ms)}`, version: n, open: true });
+    log(complete ? "ok" : "warn", complete ? `Built v${n}` : `Build v${n}: ended before the app was finished`, ms);
+    save(); renderAll();
+    return v;
+  }
+
+  // Runs the app, collects runtime errors and lint, then asks the Reviewer for a score and foresight.
+  async function checkVersion(c, steps, v, text) {
+    const chk = { label: `Checking v${v.n}: runtime and lint`, state: "run" }; steps.push(chk); renderThreadSoon();
+    await wait(1800);
+    const key = c.id + ":" + v.n, errs = (runtimeErrors[key] || []).slice(0, 10), found = lint(v.html);
+    Object.assign(chk, { label: `Checked v${v.n}: ${errs.length} runtime error${errs.length === 1 ? "" : "s"}, ${found.length} lint finding${found.length === 1 ? "" : "s"}`, state: errs.length ? "warn" : "ok", text: [...errs.map((e) => "- Runtime: " + e), ...found.map((f) => "- Lint: " + f)].join("\n") || "No problems found." });
+    found.forEach((f) => log("warn", "Lint: " + f));
+    const rv = { label: `Reviewing v${v.n}: quality and foresight`, state: "run" }; steps.push(rv); renderThreadSoon();
+    try {
+      const r = await (await api({ mode: "review", prompt: text, kind: c.kind, html: v.html, runtimeErrors: errs, lint: found })).json();
+      const review = r.review; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0); renderUsage();
+      Object.assign(rv, { label: `Quality review v${v.n}: ${review.score}/100`, state: review.score >= 85 ? "ok" : "warn", review, open: review.score < 85 });
+      v.score = review.score;
+      log(review.score >= 85 ? "ok" : "warn", `Review v${v.n}: score ${review.score}/100, ${review.issues.length} issues`);
+      if (review.foresight.length) {
+        const warnN = review.foresight.filter((f) => f.level === "warning").length;
+        steps.push({ label: `Foresight: ${warnN} warning${warnN === 1 ? "" : "s"}, ${review.foresight.length - warnN} note${review.foresight.length - warnN === 1 ? "" : "s"}`, state: warnN ? "warn" : "ok", foresight: review.foresight, open: !!warnN });
+        review.foresight.forEach((f) => log(f.level === "warning" ? "warn" : "info", `Foresight (${f.affects}): ${f.note}`));
+        if (warnN) toast(`Foresight: ${warnN} warning${warnN === 1 ? "" : "s"} for v${v.n}`, "#f59e0b");
+      }
+      return { review, errs, found };
+    } catch (e) {
+      if (e.name === "AbortError") throw e;
+      Object.assign(rv, { label: "Review unavailable", state: "warn", text: e.message }); log("warn", "Review: " + e.message);
+      return { review: null, errs, found };
+    } finally { renderThreadSoon(); }
+  }
 
   async function run() {
     if (busy) return;
     const text = $("prompt").value.trim(); if (!text) return;
+    clearTimeout(sugTimer); sugCtl?.abort(); $("sugs").innerHTML = "";
     const kind = $("kind").value, minds = selected();
     let c = active();
     if (!c) c = newChat(text.length > 48 ? text.slice(0, 46) + "…" : text, kind);
@@ -436,7 +595,7 @@ a{color:var(--blue)}
     $("prompt").value = ""; busy = true; controller = new AbortController();
     $("sendBtn").disabled = true; $("stopBtn").hidden = false; renderAll();
     stats.runs++; const t0 = performance.now();
-    log("info", `Run ${stats.runs} in "${c.title}": ${refining ? "refining v" + base.n : "new " + KIND_LABEL[kind]} with ${minds.length} minds`);
+    log("info", `Run ${stats.runs} in "${c.title}": ${refining ? "refining v" + base.n : "new " + KIND_LABEL[kind]} with ${minds.length} minds${evolve ? ", self-improve on" : ""}`);
     const fail = (label, err) => { steps.push({ label, state: "err", text: err, open: true }); log("error", label + ": " + err); stats.failed++; toast(err, "#f87171"); };
     try {
       // 1) minds plan in parallel
@@ -477,42 +636,28 @@ a{color:var(--blue)}
         }
         renderThreadSoon(); renderUsage();
       }
-      // 3) build, continuing in parts if a large app is cut off
-      const n = (c.versions[c.versions.length - 1]?.n || 0) + 1;
-      const b = { label: `Building v${n}`, state: "run", meta: "" }; steps.push(b); renderThreadSoon();
-      const s = performance.now(); let raw = "";
-      for (let part = 1; part <= MAX_PARTS; part++) {
-        if (part > 1) { b.label = `Building v${n} · part ${part}`; log("info", `v${n} is large: continuing with part ${part}`); }
-        const before = raw.length;
-        try {
-          const res = await api(part === 1
-            ? { mode: "build", prompt: text, kind: c.kind, specs, blueprint, previousHtml: base ? base.html : "" }
-            : { mode: "continue", prompt: text, kind: c.kind, specs: [], blueprint, partialHtml: raw });
-          const reader = res.body.getReader(), dec = new TextDecoder(); let last = 0;
-          while (true) {
-            const { value, done } = await reader.read(); if (done) break;
-            raw += dec.decode(value, { stream: true });
-            if (performance.now() - last > 150) { b.meta = raw.length.toLocaleString() + " chars"; renderPanel(raw); renderThreadSoon(); last = performance.now(); }
-          }
-        } catch (e) {
-          if (e.name === "AbortError") throw e;
-          if (raw.length === before) { b.state = "err"; fail(`Build of v${n} failed`, e.message); return; }
-          log("warn", `Part ${part} was cut off: ${e.message}`);
+      // 3) build
+      let v;
+      try { v = await buildVersion(c, steps, { text, specs, blueprint, base, label: "Building" }); }
+      catch (e) { if (e.name === "AbortError") throw e; fail("Build failed", e.message); return; }
+      showApp();
+      // 4) check, review and foresee; 5) one automatic improvement pass if needed
+      if (evolve) {
+        const res = await checkVersion(c, steps, v, text);
+        const needs = res.errs.length || (res.review && res.review.score < 85);
+        if (needs) {
+          const fixes = [...res.errs.map((e) => "- Runtime error: " + e), ...(res.review?.issues || []).filter((i) => i.severity !== "low").map((i) => `- [${i.severity}] ${i.area}: ${i.note}`), ...(res.review?.foresight || []).filter((f) => f.level === "warning").map((f) => `- Foresight (${f.affects}): ${f.note}`), ...res.found.map((f) => "- Lint: " + f)].join("\n");
+          steps.push({ label: "Self-improving: fixing what the checks found", state: "ok", text: fixes });
+          log("info", `Self-improve: v${v.n} → v${v.n + 1}`);
+          try {
+            const v2 = await buildVersion(c, steps, { text, specs: [], blueprint, base: v, fixes, label: "Improving" });
+            const res2 = await checkVersion(c, steps, v2, text);
+            if (res.review && res2.review) log(res2.review.score >= res.review.score ? "ok" : "warn", `Self-improve: score ${res.review.score} → ${res2.review.score}`);
+          } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + v.n, state: "warn", text: e.message }); log("warn", "Self-improve: " + e.message); }
         }
-        usage.approx += Math.round((raw.length - before) / 3.5); renderUsage();
-        if (/<\/html>\s*(```)?\s*$/i.test(raw.trim()) || raw.length === before) break;
-        if (part === 1) stats.parts++;
       }
-      const html = extractHtml(raw);
-      if (!/<(body|div|main|section|canvas)/i.test(html)) { b.state = "err"; fail(`Build of v${n} failed`, "The build didn't return a usable app. Try again or simplify the request."); return; }
-      const complete = /<\/html>\s*$/i.test(html);
-      c.versions.push({ n, html: complete ? html : html + "\n</body></html>", at: Date.now(), prompt: text });
-      c.blueprint = blueprint; c.updated = Date.now(); shownVersion = n; view = "preview";
-      const ms = performance.now() - s; stats.buildMs.push(ms);
-      Object.assign(b, { label: complete ? `Built v${n}` : `Built v${n} (may be incomplete)`, state: complete ? "ok" : "warn", meta: `${html.length.toLocaleString()} chars · ${secs(ms)}`, version: n, open: true });
-      log(complete ? "ok" : "warn", complete ? `Built v${n}` : `Build v${n}: ended before the app was finished`, ms);
       stats.ok++; log("ok", `Run ${stats.runs} finished`, performance.now() - t0);
-      toast(`v${n} is ready ✨`, "#34d399"); showApp();
+      toast(`v${active().versions[active().versions.length - 1].n} is ready ✨`, "#34d399");
     } catch (e) {
       if (e.name === "AbortError") { steps.push({ label: "Stopped", state: "warn" }); log("warn", "Run stopped by you"); stats.failed++; }
       else fail("Something went wrong", e.message);

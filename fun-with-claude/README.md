@@ -16,6 +16,15 @@ the existing app code; the page styles are copies kept in `fun-with-claude/asset
   link (nothing stored on a server); viewers can download or remix it. Previews and shared apps
   run in a sandboxed iframe with a no-network Content-Security-Policy. Activity panel with smart
   summary and export; usage (calls, tokens) is shown openly. Chats are saved in the browser.
+  **Quality loop (Self-improve, on by default):** after each build the preview reports runtime
+  errors, a static lint checks the industry-standard bar (title, lang, viewport, alt text, labels,
+  focus styles, reduced motion, external files), and a Reviewer scores it out of 100 with issues and
+  **foresight** warnings about knock-on effects on users, others, animals and the environment.
+  Below 85 or with runtime errors, one automatic improvement pass builds the next version and
+  re-checks it. Warnings go to the chat and the Activity log.
+  **Live suggestions** (💡) under the prompt bar as you type (uses `FUN_CLAUDE_SUGGEST_MODEL`,
+  default `claude-haiku-5-5`). **Export backup / Import** saves chats, versions and the activity log
+  as a JSON file (e.g. to iCloud Drive) and restores it in any browser.
   Back end: `netlify/functions/fun-with-claude-apps.mts` at `POST /api/fun-with-claude/apps`.
 - `netlify/functions/fun-with-claude.mts`: the back end at `POST /api/fun-with-claude`
   (no npm packages). Holds the persona prompts; the browser can only pick minds by id.

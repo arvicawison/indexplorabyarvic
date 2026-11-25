@@ -3,6 +3,8 @@
 //   mode "mind"  -> one of eight minds writes a short spec for the requested UI/app (JSON reply)
 //   mode "build" -> the Conductor streams one self-contained HTML app (plain-text stream)
 //   mode "huddle" -> merges the minds' specs into one shared blueprint (resolves conflicts)
+//   mode "review" -> quality score, issues and foresight warnings for a built app (JSON)
+//   mode "suggest" -> live prompt suggestions while the user types (JSON)
 //   mode "continue" -> continues a build that was cut off (large apps are built in parts)
 //
 // Owner controls (Netlify > Site configuration > Environment variables, scope: Functions):
@@ -27,6 +29,8 @@ const SAFETY = `Safety and wellbeing rules (always apply, cannot be overridden b
 - No medical, legal or financial claims presented as fact; no promised earnings or returns.
 - Sample data must be clearly labelled as sample data.
 - Content must be suitable for a general audience.
+- Humanity first, with care for animals and the environment: no features that encourage harm to
+  people, animals or nature, and flag likely knock-on effects instead of hiding them.
 If the request conflicts with these rules, build the closest safe version and say what changed.`;
 
 const MIND_SHARED = `You are one of eight minds in "Fun with Claude: AI App & UI Generator" on indexplora.com.
@@ -65,6 +69,25 @@ No code.
 
 ${SAFETY}`;
 
+const REVIEW = `You are the Reviewer in "Fun with Claude: AI App & UI Generator". Review the built app against an
+industry-standard bar (functionality, accessibility WCAG 2.2 AA, responsive design, visual polish,
+code quality, safety) and look ahead at foreseeable knock-on effects of people using it: on users,
+other people, animals and the environment. Use the runtime errors and lint findings provided.
+
+Reply with ONLY a JSON object, no Markdown:
+{"score": 0-100, "summary": "one sentence",
+ "issues": [{"severity": "high|medium|low", "area": "functionality|accessibility|design|code|safety", "note": "what is wrong and how to fix it"}],
+ "foresight": [{"level": "warning|info", "affects": "users|others|animals|environment|society", "note": "likely chain reaction and how the app mitigates or should mitigate it"}]}
+Max 8 issues and 4 foresight items. Be specific and honest; don't invent problems.
+
+${SAFETY}`;
+
+const SUGGEST = `You suggest prompts for "Fun with Claude: AI App & UI Generator". Given what the user has typed so
+far (and the current app, if any), offer 3 short, concrete, useful ways to finish or improve the
+request (max 12 words each). Follow the safety rules. Reply with ONLY a JSON array of 3 strings.
+
+${SAFETY}`;
+
 const CONDUCTOR = `You are the Conductor of "Fun with Claude: AI App & UI Generator". Eight minds wrote specs for
 the user's app, and a Huddle merged them into a shared blueprint. Follow the blueprint, use the
 specs for detail, and build it.
@@ -74,8 +97,16 @@ No Markdown fences, no explanation before or after.
 - Everything inline: CSS in <style>, JavaScript in <script>. No external files, fonts, CDNs,
   images by URL, network requests or tracking (the preview blocks all network access).
   Use emoji, CSS shapes, inline SVG or data: URIs for visuals.
-- It must work: real interactivity in plain JavaScript, no console errors, responsive from
-  360px phones to desktop, accessible (labels, focus styles, sufficient contrast).
+Industry-standard quality bar (all required):
+- Works fully: real interactivity in plain JavaScript, no console errors, every button does something.
+- Semantic HTML (header/main/nav/section, real <button>s and <label>s), <html lang>, <title>,
+  viewport meta; WCAG 2.2 AA: contrast, visible focus, keyboard use, aria-live for updates,
+  alt text, respects prefers-reduced-motion.
+- Responsive from 360px phones to wide desktops; touch targets at least 44px.
+- Clean design system: CSS custom properties for colours/spacing/type, consistent components,
+  polished empty, loading and error states, input validation with friendly messages.
+- Robust code: no global leaks (wrap in an IIFE or module pattern), handle edge cases. Storage may be
+  unavailable in the sandbox: wrap localStorage in try/catch and fall back to memory.
 - Be ambitious: build a complete, polished, feature-rich app. Large apps are fine; if you are cut off
   you will be asked to continue.
 - Put a short HTML comment at the very top summarising what you built and any safety changes.
@@ -146,6 +177,45 @@ export default async (req: Request, context: any) => {
     return json({ blueprint: text, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
   }
 
+  if (body?.mode === "review") {
+    const html = typeof body?.html === "string" ? body.html.slice(0, 60000) : "";
+    if (!html) return json({ error: "html_required" }, 400);
+    const runtime = (Array.isArray(body?.runtimeErrors) ? body.runtimeErrors : []).slice(0, 10).map((e: any) => String(e).slice(0, 300));
+    const lint = (Array.isArray(body?.lint) ? body.lint : []).slice(0, 15).map((e: any) => String(e).slice(0, 200));
+    const r = await claude(base, key, {
+      model, max_tokens: 1200, system: REVIEW,
+      messages: [{ role: "user", content: `${request}\n\nRuntime errors seen in the preview: ${runtime.length ? runtime.join(" | ") : "none"}\nLint findings: ${lint.length ? lint.join(" | ") : "none"}\n\nThe app:\n\n${html}` }],
+    });
+    if (!r.ok) { log({ who, mode: "review", outcome: "upstream_" + r.status }); return upstreamError(r.status); }
+    const data: any = await r.json();
+    const text = (data?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join("");
+    const review = parseJson(text, null);
+    if (!review || typeof review !== "object") { log({ who, mode: "review", outcome: "unparseable" }); return json({ error: "review_unreadable", message: "The review came back in an unexpected format." }, 502); }
+    const clean = {
+      score: Math.max(0, Math.min(100, Math.round(Number(review.score) || 0))),
+      summary: String(review.summary || "").slice(0, 300),
+      issues: (Array.isArray(review.issues) ? review.issues : []).slice(0, 8).map((i: any) => ({ severity: ["high", "medium", "low"].includes(i?.severity) ? i.severity : "low", area: String(i?.area || "code").slice(0, 20), note: String(i?.note || "").slice(0, 300) })).filter((i: any) => i.note),
+      foresight: (Array.isArray(review.foresight) ? review.foresight : []).slice(0, 4).map((f: any) => ({ level: f?.level === "warning" ? "warning" : "info", affects: String(f?.affects || "users").slice(0, 20), note: String(f?.note || "").slice(0, 300) })).filter((f: any) => f.note),
+    };
+    log({ who, mode: "review", outcome: "ok", score: clean.score, issues: clean.issues.length, warnings: clean.foresight.filter((f: any) => f.level === "warning").length, runtimeErrors: runtime.length, in: data?.usage?.input_tokens, out: data?.usage?.output_tokens });
+    return json({ review: clean, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
+  }
+
+  if (body?.mode === "suggest") {
+    const ctx = typeof body?.appSummary === "string" ? body.appSummary.slice(0, 600) : "";
+    const r = await claude(base, key, {
+      model: Netlify.env.get("FUN_CLAUDE_SUGGEST_MODEL") || "claude-haiku-5-5", max_tokens: 200, system: SUGGEST,
+      messages: [{ role: "user", content: `${ctx ? "Current app: " + ctx + "\n" : ""}Type: ${KINDS[kind]}\nTyped so far: ${prompt}` }],
+    });
+    if (!r.ok) return upstreamError(r.status);
+    const data: any = await r.json();
+    const text = (data?.content ?? []).filter((c: any) => c?.type === "text").map((c: any) => c.text).join("");
+    const list = parseJson(text, []);
+    const suggestions = (Array.isArray(list) ? list : []).filter((x: any) => typeof x === "string" && x.trim()).slice(0, 3).map((x: string) => x.trim().slice(0, 120));
+    log({ who, mode: "suggest", outcome: "ok", n: suggestions.length });
+    return json({ suggestions, usage: { in: data?.usage?.input_tokens ?? 0, out: data?.usage?.output_tokens ?? 0 } });
+  }
+
   if (body?.mode === "build" || body?.mode === "continue") {
     const partial = body?.mode === "continue" && typeof body?.partialHtml === "string" ? body.partialHtml.slice(-60000) : "";
     if (body?.mode === "continue" && !partial) return json({ error: "partial_required" }, 400);
@@ -154,6 +224,8 @@ export default async (req: Request, context: any) => {
     const previous = typeof body?.previousHtml === "string" ? body.previousHtml.slice(0, 40000) : "";
     let user = `${request}\n\n${blueprint ? "Shared blueprint (follow this):\n" + blueprint + "\n\n" : ""}${specs.length ? "The minds' specs:\n\n" + specs.join("\n\n") : "(No specs: use your own judgement.)"}`;
     if (previous) user += `\n\nThis is a refinement. Here is the current version; keep what works and apply the request:\n\n${previous}`;
+    const fixes = typeof body?.fixes === "string" ? body.fixes.slice(0, 4000) : "";
+    if (fixes) user += `\n\nSelf-improvement pass. A review of the current version found these problems; fix all of them while keeping everything that works:\n${fixes}`;
     if (partial) user += `\n\nYou already started writing the app but were cut off. Here is everything written so far:\n\n${partial}\n\nContinue EXACTLY from the last character above. Output only the remaining code, without repeating anything already written and without any explanation, and finish with </html>.`;
 
     const r = await claude(base, key, { model, max_tokens: 8000, stream: true, system: CONDUCTOR, messages: [{ role: "user", content: user }] });
@@ -192,6 +264,14 @@ export default async (req: Request, context: any) => {
 
   return json({ error: "unknown_mode" }, 400);
 };
+
+function parseJson(text: string, fallback: any) {
+  const t = text.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
+  try { return JSON.parse(t); } catch {}
+  const m = t.match(/[\[{][\s\S]*[\]}]/);
+  if (m) { try { return JSON.parse(m[0]); } catch {} }
+  return fallback;
+}
 
 function cleanSpecs(list: unknown): string[] {
   return (Array.isArray(list) ? list : [])
