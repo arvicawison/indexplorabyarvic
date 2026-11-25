@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Health pulse | Fun with Claude | Indexplora</title>
+<meta name="description" content="The hourly health pulse of Fun with Claude: Claude, storage and the public galleries, checked every hour.">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0b0c;--panel:#141416;--line:#26262a;--ink:#f4f4f5;--muted:#a1a1aa;--soft:#1b1b1f;--ok:#34d399;--bad:#f87171;--warn:#f59e0b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+a{color:#38bdf8}:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;border-bottom:1px solid var(--line);background:#0b0b0cd9;backdrop-filter:blur(10px)}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-weight:700}
+.mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(120deg,#ec4899,#a855f7,#38bdf8);display:grid;place-items:center;font-size:13px}
+.crumb{color:var(--muted);font-size:13px}
+.wrap{max-width:960px;margin:auto;padding:18px 16px 60px}
+h1{margin:6px 0 4px;font-size:clamp(26px,4.5vw,38px);letter-spacing:-.03em}
+.lead{color:var(--muted);margin:0 0 18px;max-width:680px}
+.hero{display:flex;align-items:center;gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.heart{width:54px;height:54px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:26px;background:radial-gradient(circle,#064e3b,#022c22);box-shadow:0 0 0 0 #34d39966;animation:beat 2.4s ease-out infinite}
+.heart.bad{background:radial-gradient(circle,#7f1d1d,#450a0a);animation:none}
+@keyframes beat{0%{box-shadow:0 0 0 0 #34d39966}70%{box-shadow:0 0 0 18px #34d39900}100%{box-shadow:0 0 0 0 #34d39900}}
+.hero b{font-size:18px}.hero small{display:block;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h2{margin:0 0 4px;font-size:14px;color:var(--muted);font-weight:600}.card p{margin:0;font-size:18px;font-weight:700}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.bars{display:flex;gap:3px;align-items:flex-end;height:46px;margin:6px 0 4px}
+.bars i{flex:1;border-radius:3px;background:var(--ok);min-width:3px}.bars i.bad{background:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600}
+.note{color:var(--muted);font-size:13px}
+@media(prefers-reduced-motion:reduce){.heart{animation:none}}
+</style>
+</head>
+<body>
+<header class="top"><a class="brand" href="../"><span class="mark" aria-hidden="true">✦</span>Fun with Claude</a><span class="crumb">/ Health pulse</span></header>
+<main class="wrap">
+<h1>💓 Health pulse</h1>
+<p class="lead">Every hour, Fun with Claude checks itself: is Claude answering, is public storage working, and is every creation and app in the public galleries well-formed and safe? Anything broken is moved to quarantine (kept 30 days, so mistakes can be undone) instead of being destroyed.</p>
+<section class="hero" aria-live="polite"><div class="heart" id="heart" aria-hidden="true">💚</div><div><b id="headline">Loading the latest pulse…</b><small id="sub"></small></div></section>
+<div class="cards" id="cards"></div>
+<h2 style="font-size:16px">Last 48 hours</h2>
+<div class="bars" id="bars" aria-label="Pulse history, oldest to newest"></div>
+<p class="note" id="uptime"></p>
+<table><thead><tr><th>Time</th><th>Result</th><th>Claude</th><th>Pantheon</th><th>Showcase</th><th>Quarantine</th></tr></thead><tbody id="rows"></tbody></table>
+<p class="note">The pulse runs on the live site at 17 minutes past every hour. It never reads anyone's personal data.</p>
+</main>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const yes = (c) => c ? (c.ok ? '<span class="ok">OK</span>' : '<span class="bad">Problem</span>') : "–";
+  try {
+    const res = await fetch("/api/fun-with-claude/status", { signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.message || "Unavailable");
+    const p = d.summary.latest;
+    if (!p) { $("headline").textContent = "No pulse yet"; $("sub").textContent = "The first hourly pulse runs at 17 minutes past the hour on the live site."; return; }
+    const when = new Date(p.at);
+    $("heart").className = "heart" + (p.ok ? "" : " bad"); $("heart").textContent = p.ok ? "💚" : "🩹";
+    $("headline").textContent = p.ok ? "All systems healthy" : "Something needs attention";
+    $("sub").textContent = `Last pulse ${when.toLocaleString()} · took ${(p.ms / 1000).toFixed(1)}s`;
+    const c = p.checks || {};
+    $("cards").innerHTML = [
+      ["Claude", c.claude?.paused ? '<span class="warn">Paused by owner</span>' : c.claude ? (c.claude.ok ? `<span class="ok">Answering</span> · ${c.claude.ms}ms` : `<span class="bad">${esc(c.claude.error || "Status " + c.claude.status)}</span>`) : "–"],
+      ["Pantheon", c.pantheon ? (c.pantheon.ok ? `<span class="ok">${c.pantheon.items}</span> creations` : '<span class="bad">Unavailable</span>') : "–"],
+      ["Showcase", c.showcase ? (c.showcase.ok ? `<span class="ok">${c.showcase.items}</span> apps` : '<span class="bad">Unavailable</span>') : "–"],
+      ["Quarantine", c.quarantine ? `${c.quarantine.held} held · ${c.quarantine.movedNow} moved this hour` : "–"],
+    ].map(([h, v]) => `<div class="card"><h2>${h}</h2><p>${v}</p></div>`).join("");
+    const hist = [...d.pulses].reverse();
+    $("bars").innerHTML = hist.map((x) => `<i class="${x.ok ? "" : "bad"}" style="height:${x.ok ? 100 : 55}%" title="${esc(new Date(x.at).toLocaleString())}: ${x.ok ? "healthy" : "problem"}"></i>`).join("");
+    $("uptime").textContent = `${d.summary.healthy} of ${d.summary.count} recent pulses healthy (${Math.round(100 * d.summary.healthy / d.summary.count)}%).`;
+    $("rows").innerHTML = d.pulses.slice(0, 24).map((x) => `<tr><td>${esc(new Date(x.at).toLocaleString())}</td><td>${x.ok ? '<span class="ok">Healthy</span>' : '<span class="bad">Problem</span>'}</td><td>${yes(x.checks?.claude)}</td><td>${yes(x.checks?.pantheon)}</td><td>${yes(x.checks?.showcase)}</td><td>${x.checks?.quarantine ? x.checks.quarantine.movedNow + " moved" : "–"}</td></tr>`).join("");
+  } catch (e) { $("heart").className = "heart bad"; $("headline").textContent = "Health history unavailable"; $("sub").textContent = e.message; }
+})();
+</script>
+</body>
+</html>

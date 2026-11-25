@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wellbeing Studio | Fun with Claude | Indexplora</title>
+<meta name="description" content="Gentle everyday wellbeing: break reminders, eye rest, breathing, stretches, water and a private mood check-in. Everything stays on your device.">
+<link rel="canonical" href="https://indexplora.com/fun-with-claude/wellbeing/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0c0c;--panel:#131716;--line:#24302c;--ink:#f0f7f4;--muted:#9fb3ab;--soft:#18201d;--accent:#34d399;--accent2:#38bdf8;--warm:#fbbf24}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 10% -10%,#0f2e24 0,transparent 50%),radial-gradient(ellipse at 100% 20%,#0c2533 0,transparent 40%),var(--bg);color:var(--ink);font:15px/1.55 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent2)}:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;background:var(--panel);padding:6px 10px;border-radius:8px;z-index:9}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;border-bottom:1px solid var(--line);background:#0b0c0cd9;backdrop-filter:blur(10px)}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-weight:700;white-space:nowrap}
+.mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(120deg,#34d399,#38bdf8);display:grid;place-items:center;font-size:13px}
+.crumb{color:var(--muted);font-size:13px}.sp{flex:1}
+.wrap{max-width:1100px;margin:auto;padding:18px 16px 60px}
+h1{margin:6px 0 4px;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.03em}
+.lead{color:var(--muted);margin:0 0 18px;max-width:700px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:18px}.card p{margin:0;color:var(--muted);font-size:14px}
+.btn{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:#3a4b45}.btn.primary{background:var(--accent);border-color:var(--accent);color:#03221a}
+.btn[aria-pressed=true]{border-color:var(--accent);background:#123026}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.big{font-size:40px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ring{width:100%;height:8px;background:#1d2724;border-radius:8px;overflow:hidden}.ring i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s}
+.breath{width:150px;height:150px;margin:6px auto;border-radius:50%;background:radial-gradient(circle,#a7f3d0 0,#34d399 45%,#0f766e 100%);transform:scale(.6);transition:transform 4s ease-in-out;box-shadow:0 0 40px #34d39944;display:grid;place-items:center;color:#03221a;font-weight:800}
+.breath.in{transform:scale(1)}
+.glasses{display:flex;gap:6px;flex-wrap:wrap}
+.glass{width:30px;height:40px;border:2px solid #2d5b67;border-radius:4px 4px 8px 8px;background:transparent;cursor:pointer;padding:0;position:relative;overflow:hidden}
+.glass.full::after{content:"";position:absolute;left:0;right:0;bottom:0;height:80%;background:linear-gradient(#38bdf8,#0e7490)}
+.moods{display:flex;gap:6px}.moods button{font-size:26px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:6px 9px;cursor:pointer}
+.moods button[aria-pressed=true]{border-color:var(--accent);background:#123026}
+.week{display:flex;gap:4px;align-items:flex-end;height:60px}.week div{flex:1;text-align:center;font-size:11px;color:var(--muted)}.week span{display:block;margin:0 auto 2px;width:70%;border-radius:4px;background:var(--accent)}
+textarea{width:100%;min-height:60px;background:#0d1110;border:1px solid var(--line);border-radius:10px;padding:8px}
+select{background:#0d1110;border:1px solid var(--line);border-radius:8px;padding:6px}
+.stretch{display:grid;gap:6px}.stretch button{text-align:left}
+.banner{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;max-width:min(520px,calc(100vw - 24px));background:#132a22;border:1px solid var(--accent);border-radius:14px;padding:12px 14px;box-shadow:0 12px 40px #000a;display:none}
+.banner.show{display:block;animation:up .35s ease}@keyframes up{from{opacity:0;transform:translate(-50%,8px)}}
+.note{font-size:12px;color:var(--muted)}
+.care{border-color:#3b3420;background:#17150f}
+@media(max-width:600px){.crumb{display:none}}
+@media(prefers-reduced-motion:reduce){.breath{transition:none}.banner.show{animation:none}.ring i{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><a class="brand" href="../"><span class="mark" aria-hidden="true">✦</span>Fun with Claude</a><span class="crumb">/ Wellbeing Studio</span><span class="sp"></span><button type="button" class="btn" id="clearAll">Clear my data</button></header>
+<main id="main" class="wrap">
+<h1>🌿 Wellbeing Studio</h1>
+<p class="lead">Small, gentle habits for a healthy day at the screen: regular breaks, resting your eyes, breathing, moving, drinking water and noticing how you feel. Everything stays on this device; nothing is sent anywhere.</p>
+<div class="grid">
+
+<section class="card" aria-labelledby="h-break"><h2 id="h-break">⏱️ Break rhythm</h2>
+<p>Work in calm blocks, then take a short break. When the block ends you'll get a gentle reminder to rest your eyes and move.</p>
+<div class="row"><label for="blockLen" class="note">Focus block</label><select id="blockLen"><option value="25">25 min</option><option value="45">45 min</option><option value="60">60 min</option></select></div>
+<div class="big" id="timer" aria-live="off">25:00</div><div class="ring" aria-hidden="true"><i id="timerRing"></i></div>
+<div class="row"><button type="button" class="btn primary" id="startBtn">Start</button><button type="button" class="btn" id="resetBtn">Reset</button><button type="button" class="btn" id="notifyBtn" aria-pressed="false">🔔 Remind me even in another tab</button></div>
+<p class="note" id="breaksToday">Breaks taken today: 0</p></section>
+
+<section class="card" aria-labelledby="h-eyes"><h2 id="h-eyes">👀 Eye rest (20-20-20)</h2>
+<p>Every 20 minutes or so, look at something about 6 metres (20 feet) away for 20 seconds, and blink slowly.</p>
+<div class="big" id="eyeCount">20</div>
+<div class="row"><button type="button" class="btn primary" id="eyeBtn">Rest my eyes for 20 seconds</button></div></section>
+
+<section class="card" aria-labelledby="h-breath"><h2 id="h-breath">🌬️ Box breathing</h2>
+<p>Breathe in for 4, hold for 4, out for 4, hold for 4. A few rounds can help you feel steadier.</p>
+<div class="breath" id="orb" aria-hidden="true">Ready</div>
+<p class="note" id="breathText" aria-live="polite" style="text-align:center">Press start and follow the circle.</p>
+<div class="row" style="justify-content:center"><button type="button" class="btn primary" id="breathBtn">Start 4 rounds</button></div></section>
+
+<section class="card" aria-labelledby="h-move"><h2 id="h-move">🧘 Quick stretches</h2>
+<p>Gentle and slow, never into pain. Stop if anything hurts.</p>
+<div class="stretch" id="stretches"></div>
+<p class="note" id="stretchStatus" aria-live="polite"></p></section>
+
+<section class="card" aria-labelledby="h-water"><h2 id="h-water">💧 Water today</h2>
+<p>Tap a glass when you drink one. Set a daily goal that suits you.</p>
+<div class="glasses" id="glasses"></div>
+<div class="row"><label for="waterGoal" class="note">Daily goal</label><select id="waterGoal"><option>6</option><option selected>8</option><option>10</option></select><span class="note" id="waterText"></span></div></section>
+
+<section class="card" aria-labelledby="h-mood"><h2 id="h-mood">🙂 How are you feeling?</h2>
+<p>A private check-in, kept only on this device.</p>
+<div class="moods" id="moods" role="group" aria-label="Mood"></div>
+<label for="moodNote" class="note">A few words (optional)</label><textarea id="moodNote" maxlength="300"></textarea>
+<div class="row"><button type="button" class="btn primary" id="moodSave">Save check-in</button><span class="note" id="moodSaved" aria-live="polite"></span></div>
+<div class="week" id="week" aria-label="Mood over the last 7 days"></div>
+<p class="note care" id="careNote" hidden style="padding:8px;border:1px solid;border-radius:10px"></p></section>
+
+</div>
+<p class="note" style="margin-top:18px">General wellness ideas only, not medical advice. If you have health concerns, talk to a doctor or another qualified professional. If you are in danger or crisis, contact your local emergency number or a crisis line right away.</p>
+</main>
+<div class="banner" id="banner" role="status" aria-live="polite"></div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const store = { get(k, d) { try { const v = JSON.parse(localStorage.getItem("fwc.well." + k)); return v ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem("fwc.well." + k, JSON.stringify(v)); } catch {} } };
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let bannerTimer = 0;
+  function banner(html, ms = 9000) { $("banner").innerHTML = html; $("banner").classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => $("banner").classList.remove("show"), ms); }
+  function buzz() { try { navigator.vibrate?.(120); } catch {} }
+
+  // ---------- break rhythm ----------
+  let total = 25 * 60, left = total, tick = 0, endAt = 0;
+  const fmt = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  function drawTimer() { $("timer").textContent = fmt(left); $("timerRing").style.width = (100 * (1 - left / total)) + "%"; }
+  function breaks() { const b = store.get("breaks", {}); return b[today()] || 0; }
+  function drawBreaks() { $("breaksToday").textContent = "Breaks taken today: " + breaks(); }
+  $("blockLen").value = String(store.get("block", 25));
+  function reset() { clearInterval(tick); tick = 0; total = left = +$("blockLen").value * 60; $("startBtn").textContent = "Start"; drawTimer(); }
+  $("blockLen").onchange = () => { store.set("block", +$("blockLen").value); reset(); };
+  $("startBtn").onclick = () => {
+    if (tick) { clearInterval(tick); tick = 0; $("startBtn").textContent = "Resume"; return; }
+    endAt = Date.now() + left * 1000; $("startBtn").textContent = "Pause";
+    tick = setInterval(() => {
+      left = Math.max(0, Math.round((endAt - Date.now()) / 1000)); drawTimer();
+      if (!left) {
+        clearInterval(tick); tick = 0; $("startBtn").textContent = "Start";
+        const b = store.get("breaks", {}); b[today()] = (b[today()] || 0) + 1; store.set("breaks", b); drawBreaks();
+        banner("🌿 <b>Time for a short break.</b> Look into the distance for 20 seconds, stand up, roll your shoulders and have some water."); buzz();
+        if (store.get("notify", false) && "Notification" in window && Notification.permission === "granted") { try { new Notification("Time for a short break 🌿", { body: "Rest your eyes, move a little and have some water." }); } catch {} }
+        total = left = +$("blockLen").value * 60; drawTimer();
+      }
+    }, 1000);
+  };
+  $("resetBtn").onclick = reset;
+  $("notifyBtn").setAttribute("aria-pressed", String(store.get("notify", false)));
+  $("notifyBtn").onclick = async () => {
+    const on = !store.get("notify", false);
+    if (on && "Notification" in window && Notification.permission !== "granted") { const p = await Notification.requestPermission().catch(() => "denied"); if (p !== "granted") { banner("Notifications are off for this site, so reminders will show on this page only.", 6000); return; } }
+    if (on && !("Notification" in window)) { banner("This browser doesn't support reminders in other tabs; they'll show on this page.", 6000); return; }
+    store.set("notify", on); $("notifyBtn").setAttribute("aria-pressed", String(on));
+  };
+  reset(); drawBreaks();
+
+  // ---------- eye rest ----------
+  let eyeTick = 0;
+  $("eyeBtn").onclick = () => {
+    if (eyeTick) return; let n = 20; $("eyeCount").textContent = n; $("eyeBtn").disabled = true;
+    eyeTick = setInterval(() => { n--; $("eyeCount").textContent = n; if (n <= 0) { clearInterval(eyeTick); eyeTick = 0; $("eyeBtn").disabled = false; $("eyeCount").textContent = "✓"; banner("👀 Nicely done. Your eyes thank you.", 4000); buzz(); } }, 1000);
+  };
+
+  // ---------- breathing ----------
+  let breathing = false;
+  $("breathBtn").onclick = async () => {
+    if (breathing) { breathing = false; return; }
+    breathing = true; $("breathBtn").textContent = "Stop";
+    const phases = [["Breathe in", true], ["Hold", true], ["Breathe out", false], ["Hold", false]];
+    for (let round = 1; round <= 4 && breathing; round++) {
+      for (const [label, inflate] of phases) {
+        if (!breathing) break;
+        $("orb").classList.toggle("in", inflate); $("orb").textContent = label.split(" ").pop();
+        for (let s = 4; s >= 1 && breathing; s--) { $("breathText").textContent = `Round ${round} of 4 · ${label} · ${s}`; await new Promise((r) => setTimeout(r, 1000)); }
+      }
+    }
+    $("orb").classList.remove("in"); $("orb").textContent = "Ready";
+    $("breathText").textContent = breathing ? "Well done. Notice how you feel now." : "Stopped. Come back any time.";
+    breathing = false; $("breathBtn").textContent = "Start 4 rounds";
+  };
+
+  // ---------- stretches ----------
+  const STRETCHES = [["Neck: slowly tilt your ear toward each shoulder", 30], ["Shoulders: roll them back 10 times, slowly", 20], ["Wrists: gentle circles both ways", 20], ["Stand up, reach up tall, then walk around for a minute", 60], ["Look away and blink slowly ten times", 15]];
+  let sTick = 0;
+  $("stretches").innerHTML = STRETCHES.map(([t, s], i) => `<button type="button" class="btn" data-i="${i}">${t} <span class="note">(${s}s)</span></button>`).join("");
+  $("stretches").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b || sTick) return;
+    const [t, s] = STRETCHES[+b.dataset.i]; let n = s;
+    $("stretchStatus").textContent = `${t}: ${n}s`;
+    sTick = setInterval(() => { n--; $("stretchStatus").textContent = n > 0 ? `${t}: ${n}s` : "✓ Done. Nicely moved!"; if (n <= 0) { clearInterval(sTick); sTick = 0; buzz(); } }, 1000);
+  };
+
+  // ---------- water ----------
+  function drawWater() {
+    const goal = +$("waterGoal").value, w = store.get("water", {}), had = w[today()] || 0;
+    $("glasses").innerHTML = Array.from({ length: goal }, (_, i) => `<button type="button" class="glass ${i < had ? "full" : ""}" data-i="${i}" aria-label="Glass ${i + 1}${i < had ? ", drunk" : ""}"></button>`).join("");
+    $("waterText").textContent = had >= goal ? `🎉 ${had} glasses: goal reached!` : `${had} of ${goal} glasses`;
+  }
+  $("waterGoal").value = String(store.get("waterGoal", 8));
+  $("waterGoal").onchange = () => { store.set("waterGoal", +$("waterGoal").value); drawWater(); };
+  $("glasses").onclick = (e) => {
+    const g = e.target.closest(".glass"); if (!g) return;
+    const w = store.get("water", {}), i = +g.dataset.i, had = w[today()] || 0;
+    w[today()] = i < had ? i : i + 1; store.set("water", w); drawWater();
+  };
+  drawWater();
+
+  // ---------- mood ----------
+  const MOODS = [["😔", "Low"], ["😕", "Meh"], ["😐", "Okay"], ["🙂", "Good"], ["😄", "Great"]];
+  let picked = null;
+  $("moods").innerHTML = MOODS.map(([e, l], i) => `<button type="button" data-v="${i + 1}" aria-pressed="false" aria-label="${l}">${e}</button>`).join("");
+  $("moods").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; picked = +b.dataset.v; $("moods").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b)); };
+  function drawWeek() {
+    const m = store.get("mood", {}), days = [];
+    for (let i = 6; i >= 0; i--) { const d = new Date(Date.now() - i * 86400000); days.push([d.toISOString().slice(0, 10), d.toLocaleDateString(undefined, { weekday: "narrow" })]); }
+    $("week").innerHTML = days.map(([k, l]) => { const v = m[k]?.v; return `<div title="${k}${v ? ": " + MOODS[v - 1][1] : ""}"><span style="height:${v ? v * 9 : 2}px;${v ? "" : "background:#24302c"}"></span>${l}</div>`; }).join("");
+    const recent = days.slice(-5).map(([k]) => m[k]?.v).filter(Boolean);
+    const low = recent.length >= 3 && recent.filter((v) => v <= 2).length >= 3;
+    $("careNote").hidden = !low;
+    if (low) $("careNote").textContent = "You've checked in feeling low on several days. It can really help to talk to someone you trust, or to a doctor or counsellor. If you ever feel unsafe, contact your local emergency number or a crisis line.";
+  }
+  $("moodSave").onclick = () => {
+    if (!picked) { $("moodSaved").textContent = "Pick how you feel first."; return; }
+    const m = store.get("mood", {}); m[today()] = { v: picked, note: $("moodNote").value.slice(0, 300) }; store.set("mood", m);
+    $("moodSaved").textContent = "Saved privately on this device."; drawWeek();
+  };
+  const todays = store.get("mood", {})[today()];
+  if (todays) { picked = todays.v; $("moods").querySelector(`[data-v="${todays.v}"]`)?.setAttribute("aria-pressed", "true"); $("moodNote").value = todays.note || ""; }
+  drawWeek();
+
+  $("clearAll").onclick = () => {
+    if (!confirm("Clear all your Wellbeing Studio data on this device?")) return;
+    try { Object.keys(localStorage).filter((k) => k.startsWith("fwc.well.")).forEach((k) => localStorage.removeItem(k)); } catch {}
+    location.reload();
+  };
+})();
+</script>
+</body>
+</html>
