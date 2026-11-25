@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI App &amp; UI Generator | Fun with Claude | Indexplora</title>
+<meta name="description" content="Describe an app or interface. Eight Claude minds plan it, the Conductor builds it, and you get a live, safe preview with smart logs.">
+<link rel="canonical" href="https://indexplora.com/fun-with-claude/app-generator/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/site.css">
+<style>
+.ag{max-width:1180px;margin:auto;padding:10px 22px 140px}
+.ag .hero{padding:44px 0 22px;text-align:left}.ag .hero h1{text-transform:none;font-size:clamp(38px,7.5vw,68px);line-height:1.02;letter-spacing:-.05em;margin:14px 0}.ag .hero p{max-width:700px;color:var(--muted);font-size:18px;margin-left:0!important}
+.ask{display:grid;gap:12px}
+.ask textarea{width:100%;min-height:100px;resize:vertical;background:#0a0a0a;border:1px solid #333;border-radius:14px;padding:14px;color:var(--ink);font:inherit}
+select{background:#0a0a0a;border:1px solid #333;border-radius:12px;padding:10px 12px;color:var(--ink);font:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative;display:inline-flex;align-items:center;gap:7px;border:1px solid #333;background:#111;color:var(--muted);border-radius:999px;padding:7px 13px;font:600 14px/1 inherit;cursor:pointer;user-select:none}
+.chip input{position:absolute;opacity:0;pointer-events:none}.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.chip:has(input:checked){color:var(--ink);border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,#111)}
+.chip:has(input:focus-visible){outline:2px solid var(--blue);outline-offset:2px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.ag .button{border:0;cursor:pointer;font:inherit}.ag .button[disabled]{opacity:.55;cursor:wait}
+.btn2{background:#1c1c1c;border:1px solid #333;color:var(--ink);border-radius:10px;font:600 13px/1 inherit;padding:9px 12px;cursor:pointer}
+.btn2:hover{border-color:#555}.btn2[aria-pressed=true]{border-color:#a855f7;background:#2a1838}
+.status{color:var(--muted);font-size:13px}.status.err{color:#fca5a5}
+.stage{margin-top:26px;display:grid;gap:14px}
+.minds{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.mind{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:14px;padding:12px 14px}
+.mind summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:8px;font-size:12px;letter-spacing:.1em;font-weight:800;color:var(--c)}
+.mind summary::-webkit-details-marker{display:none}.mind summary .st{color:var(--muted);letter-spacing:0;font-weight:600}
+.body{color:#e5e5e5;font-size:14px;overflow-wrap:anywhere}.body p{margin:.5em 0}.body ul,.body ol{padding-left:1.2em;margin:.4em 0}
+.result{border:1px solid transparent;background:linear-gradient(#121212,#121212) padding-box,var(--neon) border-box;border-radius:18px;padding:14px}
+.result .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px}
+.result .tag{font-size:12px;letter-spacing:.12em;font-weight:800;background:var(--neon);-webkit-background-clip:text;background-clip:text;color:transparent}
+.frame{width:100%;height:min(70vh,640px);border:1px solid #333;border-radius:12px;background:#fff;display:block}
+.code{width:100%;height:min(70vh,640px);margin:0;overflow:auto;background:#0a0a0a;border:1px solid #333;border-radius:12px;padding:12px;color:#d4d4d4;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.progress{height:4px;border-radius:4px;background:#222;overflow:hidden;margin-bottom:10px}.progress i{display:block;height:100%;width:0;background:var(--neon);transition:width .3s}
+.full{position:fixed;inset:0;z-index:30;background:#000d;padding:12px;display:flex;flex-direction:column;gap:8px}.full .frame{height:100%;flex:1}
+.hist{display:flex;gap:8px;flex-wrap:wrap}.hist button{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* pull-up log panel */
+.logs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#0d0d0df2;backdrop-filter:blur(10px);border-top:1px solid #2a2a2a;transform:translateY(calc(100% - 52px));transition:transform .28s ease}
+.logs.open{transform:none}
+.logs .handle{width:100%;height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 18px;background:none;border:0;color:var(--ink);font:700 14px/1 inherit;cursor:pointer}
+.logs .handle .grip{width:40px;height:4px;border-radius:4px;background:#444;position:absolute;left:50%;top:6px;transform:translateX(-50%)}
+.logs .pill2{font-weight:600;color:var(--muted);font-size:12px}
+.logs .inner{max-width:1180px;margin:auto;padding:0 18px 16px;height:min(52vh,440px);display:flex;flex-direction:column;gap:10px}
+.smart{background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:10px 12px;font-size:13px;color:#d4d4d4}
+.smart b{color:var(--ink)}
+.entries{flex:1;overflow:auto;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;border:1px solid #222;border-radius:10px;padding:8px 10px;background:#090909}
+.entries div{display:grid;grid-template-columns:64px 52px 1fr;gap:8px;padding:2px 0;border-bottom:1px dashed #1a1a1a}
+.lv-info{color:#93c5fd}.lv-ok{color:#86efac}.lv-warn{color:#fcd34d}.lv-error{color:#fca5a5}
+.toasts{position:fixed;right:16px;bottom:66px;z-index:40;display:grid;gap:8px;max-width:min(360px,calc(100vw - 32px))}
+.toast{background:#161616;border:1px solid #333;border-left:4px solid var(--c,#a855f7);border-radius:12px;padding:10px 12px;font-size:14px;box-shadow:0 10px 30px #0008;animation:pop .25s ease}
+body.logs-open .toasts{bottom:calc(min(52vh,440px) + 70px)}
+@keyframes pop{from{transform:translateY(8px);opacity:0}}
+.safety{font-size:13px;color:var(--muted);border:1px dashed #333;border-radius:12px;padding:10px 12px}
+@media(max-width:760px){.ag .hero{padding-top:30px}.minds{grid-template-columns:1fr 1fr}.entries div{grid-template-columns:58px 1fr}.entries div span:nth-child(2){display:none}}
+@media(max-width:420px){.minds{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.logs,.toast,.progress i{transition:none;animation:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header"><div class="wrap">
+<a class="logo" href="/" aria-label="Arvic Awison, Indexplora home"><span class="logo-mark" aria-hidden="true">✦</span><span class="logo-text"><b>Arvic Awison</b><small>Designer of Socio-Logics for Eternal Invincibility for All</small></span></a>
+<nav class="nav" aria-label="Primary"><a href="/">Home</a><a href="../">Fun with Claude</a><a href="./" aria-current="page" class="cta">App Generator</a></nav>
+</div></header>
+
+<main id="main" class="ag">
+<div class="brand">FUN WITH CLAUDE</div>
+<section class="hero"><span class="pill">AI APP &amp; UI GENERATOR · 8 MINDS + CONDUCTOR</span>
+<h1>Describe it.<br><span class="gradient">Watch it get built.</span></h1>
+<p>Eight Claude minds plan your app from every angle. The Conductor combines their specs and builds a working app you can try right here, safely sandboxed. Every step shows up in the smart log.</p></section>
+
+<form class="panel ask" id="ask">
+<label for="q" style="font-weight:700">Describe your app or interface</label>
+<textarea id="q" maxlength="3000" required placeholder="Example: A habit tracker for a community wellbeing challenge, with streaks, a weekly chart and a friendly coach"></textarea>
+<div class="row" style="justify-content:flex-start"><label for="kind" class="status">Type</label>
+<select id="kind"><option value="app">Interactive app</option><option value="landing">Landing page</option><option value="dashboard">Dashboard</option><option value="tool">Calculator / tool</option><option value="game">Mini game</option><option value="form">Multi-step form</option><option value="assistant">AI-assistant style UI</option></select></div>
+<fieldset style="border:0;padding:0;margin:0"><legend class="status" style="margin-bottom:8px">Minds planning it (the Conductor always builds)</legend><div class="chips" id="chips"></div></fieldset>
+<div class="row"><span class="status" id="status" role="status" aria-live="polite"></span>
+<div style="display:flex;gap:12px;align-items:center"><button type="button" class="btn2" id="newApp" hidden>New app</button><button type="button" class="btn2" id="stop" hidden>Stop</button><button class="button" id="go" type="submit">Generate app</button></div></div>
+<p class="safety">🛡️ Built-in safety: generated apps run in a locked sandbox with no network, cookies or access to your account; the minds follow fixed rules against impersonation, data harvesting, dark patterns and unsafe claims. Use sample data only.</p>
+</form>
+
+<section class="stage" id="stage" hidden>
+<div class="result" id="result">
+<div class="bar"><span class="tag" id="rtag">CONDUCTOR</span>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<button type="button" class="btn2" id="tPrev" aria-pressed="true">Preview</button><button type="button" class="btn2" id="tCode" aria-pressed="false">Code</button>
+<button type="button" class="btn2" id="bFull">Full screen</button><button type="button" class="btn2" id="bCopy">Copy</button><button type="button" class="btn2" id="bDl">Download</button></div></div>
+<div class="progress" id="prog"><i></i></div>
+<iframe class="frame" id="frame" title="Generated app preview" sandbox="allow-scripts allow-modals" referrerpolicy="no-referrer"></iframe>
+<pre class="code" id="code" hidden></pre>
+</div>
+<div class="minds" id="minds"></div>
+</section>
+
+<section id="histWrap" style="margin-top:26px" hidden><h2 style="font-size:18px">Your recent builds</h2><div class="hist" id="hist"></div></section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<aside class="logs" id="logs" aria-label="Smart log">
+<button type="button" class="handle" id="logHandle" aria-expanded="false" aria-controls="logInner"><span class="grip" aria-hidden="true"></span><span><span id="arrow" aria-hidden="true">▲</span> Smart log <span class="pill2" id="logCount">0 events</span></span><span class="pill2" id="logHint">Pull up</span></button>
+<div class="inner" id="logInner">
+<div class="smart" id="smart">No activity yet.</div>
+<div class="row"><div style="display:flex;gap:6px"><button type="button" class="btn2" data-f="all" aria-pressed="true">All</button><button type="button" class="btn2" data-f="warn" aria-pressed="false">Warnings &amp; errors</button></div>
+<div style="display:flex;gap:6px"><button type="button" class="btn2" id="logExport">Export</button><button type="button" class="btn2" id="logClear">Clear</button></div></div>
+<div class="entries" id="entries" role="log"></div>
+</div>
+</aside>
+
+<script>
+(() => {
+  const API = "/api/fun-with-claude/apps";
+  const SESSION_KEY = "sb-zncmwdqqdgselvrmghwc-auth-token";
+  const MINDS = [
+    { id: "strategist", name: "Strategist", color: "#38bdf8" }, { id: "scientist", name: "Scientist", color: "#34d399" },
+    { id: "skeptic", name: "Skeptic", color: "#f97316" },       { id: "creator", name: "Creator", color: "#ec4899" },
+    { id: "earner", name: "Earner", color: "#facc15" },         { id: "storyteller", name: "Storyteller", color: "#a78bfa" },
+    { id: "designer", name: "Designer", color: "#2dd4bf" },     { id: "futurist", name: "Futurist", color: "#f43f5e" },
+  ];
+  // Locks every preview down: no network, no form posts, no navigation. Applied on top of the iframe sandbox.
+  const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
+  const $ = (id) => document.getElementById(id);
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } } };
+
+  // ---------- smart log ----------
+  const LOG = []; let filter = "all"; const stats = { runs: 0, ok: 0, failed: 0, mindMs: [], buildMs: [], chars: [], errors: {} };
+  function log(level, msg, ms) {
+    const e = { t: new Date(), level, msg, ms }; LOG.push(e); if (LOG.length > 500) LOG.shift();
+    if (level === "error" || level === "warn") { const k = msg.includes(": ") ? msg.slice(msg.indexOf(": ") + 2) : msg; stats.errors[k] = (stats.errors[k] || 0) + 1; }
+    renderLog();
+  }
+  function renderLog() {
+    $("logCount").textContent = LOG.length + (LOG.length === 1 ? " event" : " events");
+    const warnN = LOG.filter((e) => e.level === "warn" || e.level === "error").length;
+    $("logHint").textContent = warnN ? `${warnN} need attention` : ($("logs").classList.contains("open") ? "Pull down" : "Pull up");
+    const rows = LOG.filter((e) => filter === "all" || e.level === "warn" || e.level === "error").slice(-200);
+    $("entries").innerHTML = "";
+    for (const e of rows) {
+      const d = document.createElement("div");
+      d.innerHTML = `<span>${e.t.toLocaleTimeString([], { hour12: false })}</span><span class="lv-${e.level}">${e.level.toUpperCase()}</span><span></span>`;
+      d.lastChild.textContent = e.msg + (e.ms != null ? ` (${(e.ms / 1000).toFixed(1)}s)` : "");
+      $("entries").append(d);
+    }
+    $("entries").scrollTop = $("entries").scrollHeight;
+    $("smart").innerHTML = smartSummary();
+  }
+  function avg(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length / 1000 : 0; }
+  function smartSummary() {
+    if (!stats.runs) return "No activity yet. Generate an app and every step will appear here.";
+    const parts = [`<b>${stats.runs}</b> generation${stats.runs > 1 ? "s" : ""}: <b>${stats.ok}</b> built, <b>${stats.failed}</b> failed.`];
+    if (stats.mindMs.length) parts.push(`Minds answer in <b>${avg(stats.mindMs).toFixed(1)}s</b> on average.`);
+    if (stats.buildMs.length) parts.push(`Builds take <b>${avg(stats.buildMs).toFixed(1)}s</b> and average <b>${Math.round(stats.chars.reduce((a, b) => a + b, 0) / stats.chars.length).toLocaleString()}</b> characters.`);
+    const top = Object.entries(stats.errors).sort((a, b) => b[1] - a[1])[0];
+    if (top) {
+      const tip = /busy|429|Too many/i.test(top[0]) ? "Wait a minute between runs, or turn off a few minds." : /sign in|auth/i.test(top[0]) ? "Sign in to Indexplora, then try again." : /cut off|incomplete/i.test(top[0]) ? "Ask for a simpler app, or refine in smaller steps." : "Try again; if it repeats, export the log.";
+      parts.push(`Most common issue: <b>${esc(top[0])}</b> (×${top[1]}). ${tip}`);
+    } else parts.push("No issues so far.");
+    return parts.join(" ");
+  }
+  $("logHandle").onclick = () => { const o = $("logs").classList.toggle("open"); $("logHandle").setAttribute("aria-expanded", o); $("arrow").textContent = o ? "▼" : "▲"; document.body.classList.toggle("logs-open", o); renderLog(); };
+  document.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll("[data-f]").forEach((x) => x.setAttribute("aria-pressed", x === b)); renderLog(); });
+  $("logClear").onclick = () => { LOG.length = 0; renderLog(); };
+  $("logExport").onclick = () => download("fun-with-claude-log.json", JSON.stringify({ exported: new Date().toISOString(), stats, events: LOG }, null, 2), "application/json");
+
+  // ---------- pop-up alerts ----------
+  function toast(msg, color) {
+    const t = document.createElement("div"); t.className = "toast"; t.style.setProperty("--c", color || "#a855f7"); t.textContent = msg;
+    $("toasts").append(t); setTimeout(() => t.remove(), 4500);
+  }
+
+  // ---------- minds ----------
+  let saved = null; try { saved = JSON.parse(store.get("fwc.app.minds") || "null"); } catch {}
+  for (const m of MINDS) {
+    const lab = document.createElement("label"); lab.className = "chip"; lab.style.setProperty("--c", m.color);
+    lab.innerHTML = `<input type="checkbox" value="${m.id}"><span class="dot"></span>${m.name}`;
+    lab.querySelector("input").checked = !Array.isArray(saved) || saved.includes(m.id);
+    $("chips").append(lab);
+  }
+  const selected = () => [...$("chips").querySelectorAll("input:checked")].map((i) => i.value);
+  $("chips").addEventListener("change", () => store.set("fwc.app.minds", JSON.stringify(selected())));
+
+  // ---------- helpers ----------
+  function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function md(src) {
+    const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    let out = "", list = false;
+    for (const line of src.split("\n")) {
+      const m = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)/);
+      if (m) { if (!list) { out += "<ul>"; list = true; } out += `<li>${inline(m[1])}</li>`; }
+      else { if (list) { out += "</ul>"; list = false; } if (line.trim()) out += `<p>${inline(line.replace(/^#+\s*/, ""))}</p>`; }
+    }
+    return out + (list ? "</ul>" : "");
+  }
+  function token() {
+    try { const raw = JSON.parse(store.get(SESSION_KEY) || "null"); const s = raw?.currentSession ?? raw;
+      if (s?.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now())) return s.access_token; } catch {}
+    return null;
+  }
+  function headers() { const t = token(); return Object.assign({ "content-type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}); }
+  async function errorFrom(res) {
+    let d = {}; try { d = await res.json(); } catch {}
+    const e = new Error(d.message || (res.status === 429 ? "Too many requests: wait a minute and try again." : res.status === 404 ? "The generator isn't deployed on this site yet." : "Request failed (" + res.status + ")."));
+    e.code = d.error || res.status; return e;
+  }
+  function extractHtml(raw) {
+    let s = raw.replace(/^\s*```(?:html)?\s*/i, "").replace(/```\s*$/, "");
+    const a = s.search(/<!doctype html|<html[\s>]/i); if (a > 0) s = s.slice(a);
+    const z = s.toLowerCase().lastIndexOf("</html>"); if (z >= 0) s = s.slice(0, z + 7);
+    return s.trim();
+  }
+  function lockDown(html) {
+    const h = html.match(/<head[^>]*>/i);
+    if (h) return html.replace(h[0], h[0] + CSP);
+    const d = html.match(/<!doctype[^>]*>/i);
+    return d ? html.replace(d[0], d[0] + CSP) : CSP + html;
+  }
+  function download(name, text, type) {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+    document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  // ---------- result view ----------
+  let current = null; // { prompt, kind, html }
+  let view = "preview";
+  function setView(v) {
+    view = v; $("tPrev").setAttribute("aria-pressed", v === "preview"); $("tCode").setAttribute("aria-pressed", v === "code");
+    $("frame").hidden = v !== "preview"; $("code").hidden = v !== "code";
+  }
+  $("tPrev").onclick = () => setView("preview"); $("tCode").onclick = () => setView("code");
+  function showPreview(html) { $("frame").srcdoc = lockDown(html); }
+  $("bCopy").onclick = () => current && navigator.clipboard?.writeText(current.html).then(() => toast("Code copied", "#34d399"), () => toast("Couldn't copy", "#f97316"));
+  $("bDl").onclick = () => current && download(slug(current.prompt) + ".html", current.html, "text/html");
+  $("bFull").onclick = () => {
+    if (!current) return;
+    const wrap = document.createElement("div"); wrap.className = "full";
+    wrap.innerHTML = `<div class="row"><b>${esc(current.prompt.slice(0, 80))}</b><button type="button" class="btn2">Close ✕</button></div><iframe class="frame" sandbox="allow-scripts allow-modals" title="Generated app, full screen"></iframe>`;
+    wrap.querySelector("iframe").srcdoc = lockDown(current.html);
+    const close = () => { wrap.remove(); document.removeEventListener("keydown", onKey); $("bFull").focus(); };
+    const onKey = (e) => e.key === "Escape" && close();
+    wrap.querySelector("button").onclick = close; document.addEventListener("keydown", onKey);
+    document.body.append(wrap); wrap.querySelector("button").focus();
+  };
+  const slug = (s) => (s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "app");
+
+  // ---------- history ----------
+  function history() { try { return JSON.parse(store.get("fwc.app.history") || "[]"); } catch { return []; } }
+  function saveHistory(item) {
+    let h = [item, ...history().filter((x) => x.prompt !== item.prompt)].slice(0, 8);
+    while (h.length && !store.set("fwc.app.history", JSON.stringify(h))) h = h.slice(0, -1); // shrink if storage is full
+    renderHistory();
+  }
+  function renderHistory() {
+    const h = history(); $("histWrap").hidden = !h.length; $("hist").innerHTML = "";
+    for (const item of h) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "btn2"; b.textContent = item.prompt; b.title = new Date(item.at).toLocaleString();
+      b.onclick = () => { current = Object.assign({}, item, { fresh: true }); setRefine(true); $("stage").hidden = false; $("minds").innerHTML = ""; $("rtag").textContent = "REOPENED FROM HISTORY"; $("code").textContent = item.html; showPreview(item.html); setView("preview"); $("prog").firstChild.style.width = "100%"; log("info", "Reopened from history: " + item.prompt.slice(0, 60)); $("stage").scrollIntoView({ behavior: "smooth" }); };
+      $("hist").append(b);
+    }
+  }
+  renderHistory();
+
+  function setRefine(on) {
+    $("go").textContent = on ? "Refine app" : "Generate app"; $("newApp").hidden = !on;
+    $("q").placeholder = on ? "Refine it: e.g. add dark mode and a reset button" : "Example: A habit tracker for a community wellbeing challenge, with streaks, a weekly chart and a friendly coach";
+  }
+  $("newApp").onclick = () => { if (current) current.fresh = false; setRefine(false); log("info", "Starting a new app"); $("q").focus(); };
+
+  // ---------- generate ----------
+  let busy = false, controller = null;
+  $("stop").onclick = () => controller?.abort();
+  $("ask").addEventListener("submit", async (ev) => {
+    ev.preventDefault(); if (busy) return;
+    const prompt = $("q").value.trim(), kind = $("kind").value, minds = selected();
+    if (!prompt) return;
+    const refining = current && !$("stage").hidden && current.fresh;
+    busy = true; $("go").disabled = true; $("stop").hidden = false; controller = new AbortController();
+    stats.runs++; const t0 = performance.now(); const startedAt = new Date();
+    log("info", `Generation #${stats.runs} started: "${prompt.slice(0, 60)}" (${$("kind").selectedOptions[0].text}, ${minds.length} minds${refining ? ", refining" : ""})`);
+    $("stage").hidden = false; $("minds").innerHTML = ""; $("code").textContent = ""; $("frame").srcdoc = "";
+    $("rtag").textContent = "CONDUCTOR · WAITING FOR THE MINDS"; $("prog").firstChild.style.width = "4%";
+    $("status").className = "status"; $("status").textContent = minds.length ? "The minds are planning…" : "The Conductor is building…";
+
+    // 1) minds write specs in parallel
+    let done = 0;
+    const specs = (await Promise.all(minds.map(async (id) => {
+      const m = MINDS.find((x) => x.id === id);
+      const el = document.createElement("details"); el.className = "mind"; el.style.setProperty("--c", m.color);
+      el.innerHTML = `<summary>${m.name.toUpperCase()}<span class="st">planning…</span></summary><div class="body"></div>`;
+      $("minds").append(el);
+      const s = performance.now();
+      try {
+        const res = await fetch(API, { method: "POST", headers: headers(), signal: controller.signal, body: JSON.stringify({ mode: "mind", mind: id, prompt, kind, previousSummary: refining ? current.prompt : "" }) });
+        if (!res.ok) throw await errorFrom(res);
+        const r = await res.json(); const ms = performance.now() - s; stats.mindMs.push(ms);
+        el.querySelector(".body").innerHTML = md(r.text); el.querySelector(".st").textContent = "✓ " + (ms / 1000).toFixed(1) + "s";
+        log("ok", `${m.name} spec ready`, ms); return { mind: id, text: r.text };
+      } catch (e) {
+        el.querySelector(".st").textContent = "✕"; el.querySelector(".body").textContent = e.name === "AbortError" ? "Stopped." : e.message;
+        if (e.name !== "AbortError") log(e.code === "authentication_required" ? "error" : "warn", `${m.name}: ${e.message}`);
+        return null;
+      } finally { done++; $("prog").firstChild.style.width = (4 + 36 * done / minds.length) + "%"; }
+    }))).filter(Boolean);
+
+    if (controller.signal.aborted) return finish(false, "Stopped.");
+    if (minds.length && !specs.length) return finish(false, LOG.some((e) => /sign in/i.test(e.msg) && e.t >= startedAt) ? "Please sign in to use the generator." : "No mind could plan this. Check the smart log.");
+
+    // 2) Conductor streams the build
+    $("rtag").textContent = "CONDUCTOR · BUILDING"; $("status").textContent = "The Conductor is building your app…"; setView("code");
+    log("info", `Conductor building from ${specs.length} spec${specs.length === 1 ? "" : "s"}`);
+    const s = performance.now(); let raw = "";
+    try {
+      const res = await fetch(API, { method: "POST", headers: headers(), signal: controller.signal, body: JSON.stringify({ mode: "build", prompt, kind, specs, previousHtml: refining ? current.html : "" }) });
+      if (!res.ok) throw await errorFrom(res);
+      const reader = res.body.getReader(), dec = new TextDecoder(); let last = 0;
+      while (true) {
+        const { value, done } = await reader.read(); if (done) break;
+        raw += dec.decode(value, { stream: true });
+        if (performance.now() - last > 120) { $("code").textContent = raw; $("code").scrollTop = $("code").scrollHeight; $("prog").firstChild.style.width = Math.min(97, 40 + raw.length / 220) + "%"; last = performance.now(); }
+      }
+    } catch (e) {
+      if (e.name === "AbortError") return finish(false, "Stopped.");
+      log("error", "Build failed: " + e.message); return finish(false, e.message);
+    }
+    const ms = performance.now() - s; const html = extractHtml(raw);
+    $("code").textContent = html;
+    if (!/<\/html>\s*$/i.test(html)) log("warn", "Build cut off: the app may be incomplete");
+    if (!/<(body|div|main|section|canvas)/i.test(html)) { log("error", "Build incomplete: no usable HTML returned"); return finish(false, "The build didn't return a usable app. Try again or simplify the request."); }
+    stats.buildMs.push(ms); stats.chars.push(html.length);
+    log("ok", `App built: ${html.length.toLocaleString()} characters`, ms);
+    current = { prompt, kind, html, at: Date.now(), fresh: true };
+    showPreview(html); setView("preview"); saveHistory({ prompt, kind, html, at: current.at });
+    finish(true);
+
+    function finish(ok, msg) {
+      busy = false; $("go").disabled = false; $("stop").hidden = true; controller = null;
+      $("prog").firstChild.style.width = ok ? "100%" : "0";
+      if (ok) {
+        stats.ok++; log("ok", `Generation #${stats.runs} finished`, performance.now() - t0);
+        $("rtag").textContent = "CONDUCTOR · YOUR APP"; $("status").textContent = "Done. Describe a change to refine it, or a new app.";
+        $("q").value = ""; setRefine(true);
+        toast("Your app is ready ✨", "#34d399");
+      } else {
+        stats.failed++; if (current) current.fresh = !!current.html;
+        $("rtag").textContent = "CONDUCTOR · NOT BUILT"; $("status").className = "status err"; $("status").textContent = msg;
+        if (/sign in/i.test(msg)) $("status").innerHTML = 'Please <a href="/sign-in">sign in to Indexplora</a> to use the generator.';
+        toast(msg, "#f97316");
+      }
+      renderLog();
+    }
+  });
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("ask").requestSubmit(); });
+  renderLog();
+})();
+</script>
+</body>
+</html>
