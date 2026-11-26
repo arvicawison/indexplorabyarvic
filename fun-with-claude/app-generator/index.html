@@ -56,6 +56,10 @@ a{color:var(--blue)}
 .minis{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
 .mini{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)}
 .mini.ok{color:var(--ink);border-color:var(--c)}.mini.err{color:var(--err);border-color:#7f1d1d}
+.failbox{margin-top:8px;border:1px solid #5b2626;background:#1c1416;border-radius:10px;padding:8px 10px}
+.failsum{color:#fca5a5;font-size:13px;margin-bottom:4px}
+.faillist{margin:4px 0;padding-left:16px;font-size:13px}.faillist li{margin:2px 0}
+.failfix{color:#fcd34d;font-size:13px;margin-top:4px}
 .spec{border-left:3px solid var(--c);padding-left:8px;margin:8px 0}
 .spec b{color:var(--c);font-size:11px;letter-spacing:.08em}
 .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
@@ -159,6 +163,8 @@ a{color:var(--blue)}
       <div class="pop"><button type="button" class="ib" id="mindsBtn" aria-expanded="false" aria-haspopup="true">Minds 8/8 ▾</button><div class="menu" id="mindsMenu" hidden></div></div>
       <button type="button" class="ib" id="sugBtn" aria-pressed="true" title="Live suggestions while you type">💡</button>
       <button type="button" class="ib" id="evoBtn" aria-pressed="true" title="Review every build and automatically improve weak ones">Self-improve</button>
+      <button type="button" class="ib" id="autoBtn" aria-pressed="false" title="Autonomous: keep planning, building, reviewing and fixing until the quality target is met">Auto ⟳</button>
+      <select id="target" aria-label="Quality target" title="Quality target the agent builds toward"><option value="85">target 85</option><option value="90" selected>target 90</option><option value="95">target 95</option></select>
       <button type="button" class="ib" id="stopBtn" hidden>■ Stop</button>
       <button class="send" id="sendBtn" type="submit">Build</button>
     </div>
@@ -256,7 +262,28 @@ a{color:var(--blue)}
   async function errorFrom(res) {
     let d = {}; try { d = await res.json(); } catch {}
     const e = new Error(d.message || (res.status === 429 ? "Too many requests: wait a moment and try again." : res.status === 404 ? "The generator isn't deployed on this site yet." : "Request failed (" + res.status + ")."));
-    e.code = d.error || res.status; return e;
+    e.code = d.error || res.status; e.status = res.status; return e;
+  }
+  const CAT_LABEL = { timeout: "timed out", signin: "sign-in expired", paused: "generator paused", config: "Claude not connected", ratelimit: "AI rate limit reached", busy: "Claude overloaded", empty: "empty or malformed reply", notdeployed: "not deployed yet", network: "network problem", other: "other error" };
+  const CAT_FIX = { timeout: "Try again, or lower the builder count so each builder has more room.", signin: "Sign in to Indexplora again, then retry.", paused: "The site owner paused the generator (FUN_CLAUDE_PAUSED); unpause it to continue.", config: "Claude isn't connected — add an ANTHROPIC_API_KEY in Netlify or enable AI credits.", ratelimit: "Wait a minute, lower the builder count, or add your own Claude key so you're not sharing a limit.", busy: "Claude is busy right now — wait a moment and try again, or lower the builder count.", empty: "Try again; if it repeats, simplify the request or use fewer builders.", notdeployed: "Publish the site first, then retry.", network: "Check your connection and try again.", other: "Try again; if it keeps happening, export the Activity log." };
+  function failReason(e) {
+    const code = String(e?.code || ""), st = e?.status || 0, m = ((e?.message || "") + " " + code).toLowerCase();
+    if (code === "timeout" || /timed out|took too long/.test(m)) return { why: "the request timed out — no reply came back within 45 seconds", cat: "timeout" };
+    if (code === "authentication_required" || st === 401 || /sign in/.test(m)) return { why: "the Indexplora sign-in has expired", cat: "signin" };
+    if (code === "paused") return { why: "the generator is paused by the site owner", cat: "paused" };
+    if (code === "service_not_configured") return { why: "Claude isn't connected (no API key or AI credits)", cat: "config" };
+    if (st === 429 || /too many|rate limit/.test(m)) return { why: "the shared AI rate limit was hit — too many requests at once", cat: "ratelimit" };
+    if (code === "upstream_busy" || st === 529 || /busy|overloaded|529/.test(m)) return { why: "Claude was overloaded and couldn't take the request", cat: "busy" };
+    if (code === "module_unreadable" || code === "unreadable" || /empty|unreadable|unexpected format|malformed/.test(m)) return { why: "Claude's reply came back empty or malformed, so there was no usable code", cat: "empty" };
+    if (st === 404 || code === "404") return { why: "the generator isn't deployed on this site yet", cat: "notdeployed" };
+    if (code === "upstream_unreachable" || /reach|network|failed to fetch/.test(m)) return { why: "couldn't reach Claude — a network problem", cat: "network" };
+    return { why: e?.message || "an unexpected error", cat: "other" };
+  }
+  function groupFails(fails) {
+    const g = {}; for (const f of fails) g[f.cat] = (g[f.cat] || 0) + 1;
+    const summary = Object.entries(g).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${CAT_LABEL[k] || k}`).join(", ");
+    const top = Object.entries(g).sort((a, b) => b[1] - a[1])[0]?.[0] || "other";
+    return { summary, fix: CAT_FIX[top] || CAT_FIX.other };
   }
   async function api(payload) {
     usage.calls++; renderUsage();
@@ -376,7 +403,14 @@ a{color:var(--blue)}
   function stepHtml(s) {
     const icon = { run: "", ok: "✓", warn: "!", err: "✕" }[s.state];
     let det = "";
-    if (s.minis) det += `<div class="minis">${s.minis.map((m) => `<span class="mini ${m.state}" style="--c:${m.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${esc(m.name)}</span>`).join("")}</div>`;
+    if (s.minis) {
+      det += `<div class="minis">${s.minis.map((m) => `<span class="mini ${m.state}" style="--c:${m.color}"${m.fail ? ` title="${esc(m.fail.why)}"` : ""}>${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${esc(m.name)}</span>`).join("")}</div>`;
+      const fails = s.minis.filter((m) => m.fail).map((m) => m.fail);
+      if (fails.length) {
+        const g = groupFails(fails);
+        det += `<div class="failbox"><div class="failsum">⚠️ <b>${fails.length} of ${s.minis.length} builders failed</b> — ${esc(g.summary)}</div><ul class="faillist">${fails.map((f) => `<li><b>Builder ${f.builder} · ${esc(f.name)}</b>: ${esc(f.why)} <span class="note">(after ${f.attempts} ${f.attempts === 1 ? "try" : "tries"}, ${esc(f.model)})</span></li>`).join("")}</ul><div class="failfix">💡 ${esc(g.fix)}</div></div>`;
+      }
+    }
     if (s.minds) det += `<div class="minis">${s.minds.map((m) => { const mm = MINDS.find((x) => x.id === m.id); return `<span class="mini ${m.state}" style="--c:${mm.color}">${m.state === "ok" ? "✓ " : m.state === "err" ? "✕ " : "… "}${mm.name}</span>`; }).join("")}</div>`;
     if (s.specs) det += s.specs.map((x) => { const mm = MINDS.find((m) => m.id === x.mind); return `<div class="spec" style="--c:${mm.color}"><b>${mm.name.toUpperCase()}</b>${md(x.text)}</div>`; }).join("");
     if (s.review) {
@@ -550,20 +584,29 @@ a{color:var(--blue)}
     await Promise.all(modules.map(async (m, i) => {
       const mini = b.minis[i], t = performance.now();
       for (let attempt = 1; attempt <= 3; attempt++) {
+        const usedLite = attempt > 1;
         try {
-          const r = await (await api({ mode: "module", prompt: text, kind: c.kind, features: featuresOf(c), module: m, shell, modules: modules.map(({ id, name, emits, listens }) => ({ id, name, emits, listens })), fixes: fixes || undefined, lite: attempt > 1 })).json();
+          const r = await (await api({ mode: "module", prompt: text, kind: c.kind, features: featuresOf(c), module: m, shell, modules: modules.map(({ id, name, emits, listens }) => ({ id, name, emits, listens })), fixes: fixes || undefined, lite: usedLite })).json();
           results[m.id] = r; mini.state = "ok"; usage.tokens += (r.usage?.in || 0) + (r.usage?.out || 0);
-          log("ok", `Builder ${i + 1} finished "${m.name}"`, performance.now() - t); break;
+          log("ok", `Builder ${i + 1} finished "${m.name}"${usedLite ? " (lighter model)" : ""}`, performance.now() - t); break;
         } catch (e) {
           if (e.name === "AbortError") throw e;
-          if (attempt < 3 && /busy|Too many|429|502|503|504|reach|error/i.test(e.message + e.code)) { log("info", `Builder ${i + 1} retrying${attempt === 1 ? " with the lighter model" : ""}`); await wait(1200 * attempt + Math.random() * 1500); continue; }
-          mini.state = "err"; log("warn", `Builder ${i + 1} ("${m.name}"): ${e.message}`); break;
+          const retryable = /busy|too many|429|502|503|504|reach|overloaded|529|timed out|timeout|error/i.test(e.message + " " + e.code);
+          if (attempt < 3 && retryable) { log("info", `Builder ${i + 1} ("${m.name}") hit "${failReason(e).why}" — retrying${attempt === 1 ? " with the lighter model" : ""} (try ${attempt + 1} of 3)`); await wait(1200 * attempt + Math.random() * 1500); continue; }
+          const fr = failReason(e);
+          mini.state = "err"; mini.fail = { name: m.name, builder: i + 1, why: fr.why, cat: fr.cat, attempts: attempt, model: usedLite ? "lighter model" : "main model" };
+          log("warn", `Builder ${i + 1} ("${m.name}") FAILED after ${attempt} ${attempt === 1 ? "try" : "tries"} (${usedLite ? "lighter model" : "main model"}): ${fr.why}`, performance.now() - t);
+          break;
         }
       }
       done++; b.meta = `${done}/${modules.length}`; renderPanel(`/* ${done} of ${modules.length} modules ready… */`); renderThreadSoon(); renderUsage();
     }));
     const ok = modules.filter((m) => results[m.id]).length;
-    if (!ok) { b.state = "err"; throw new Error("No builder could finish a module. Check Activity for details."); }
+    if (!ok) {
+      b.state = "err";
+      const g = groupFails(b.minis.filter((x) => x.fail).map((x) => x.fail));
+      throw new Error(`None of the ${modules.length} builders could finish${g.summary ? " — " + g.summary : ""}. ${g.fix}`);
+    }
     const html = assemble(shell, modules, results);
     const ms = performance.now() - s1; stats.buildMs.push(ms);
     const v = { n: n2, html, at: Date.now(), prompt: text, plan: { shell, modules } };
@@ -580,6 +623,12 @@ a{color:var(--blue)}
   function syncToggles() { $("evoBtn").setAttribute("aria-pressed", evolve); $("sugBtn").setAttribute("aria-pressed", suggestOn); $("sugwrap").hidden = !suggestOn; }
   $("evoBtn").onclick = () => { evolve = !evolve; store.set("fwc.evolve", evolve ? "1" : "0"); syncToggles(); toast(evolve ? "Self-improve on: weak builds get one automatic improvement pass" : "Self-improve off", "#a855f7"); };
   $("sugBtn").onclick = () => { suggestOn = !suggestOn; store.set("fwc.suggest", suggestOn ? "1" : "0"); syncToggles(); };
+  let autoMode = pref("fwc.auto", false);
+  let target = (() => { const t = +(store.get("fwc.target") || 90); return [85, 90, 95].includes(t) ? t : 90; })();
+  $("target").value = String(target);
+  $("autoBtn").setAttribute("aria-pressed", autoMode);
+  $("autoBtn").onclick = () => { autoMode = !autoMode; store.set("fwc.auto", autoMode ? "1" : "0"); $("autoBtn").setAttribute("aria-pressed", autoMode); if (autoMode && !evolve) { evolve = true; store.set("fwc.evolve", "1"); syncToggles(); } toast(autoMode ? `Auto mode on — the agent builds and keeps improving on its own until it reaches ${target}/100` : "Auto mode off", "#a855f7"); };
+  $("target").onchange = () => { target = +$("target").value; store.set("fwc.target", String(target)); if (autoMode) toast(`Auto target set to ${target}/100`, "#a855f7"); };
   syncToggles();
 
   // ---------- live suggestions under the prompt bar, evolving with the user's own history ----------
@@ -783,21 +832,32 @@ a{color:var(--blue)}
           catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Parallel build unavailable: switching to one builder", state: "warn", text: e.message }); log("warn", "Parallel build: " + e.message); }
         }
         if (!v) v = await buildVersion(c, steps, { text, specs, blueprint, base, label: "Building" });
-      } catch (e) { if (e.name === "AbortError") throw e; fail("Build failed", e.message); return; }
+      } catch (e) { if (e.name === "AbortError") throw e; const fr = failReason(e); fail("Build failed", /None of the|builders|timed out|overloaded|rate limit|sign-in|not connected|not deployed/i.test(e.message) ? e.message : `${fr.why}. ${CAT_FIX[fr.cat] || ""}`.trim()); return; }
       showApp();
-      // 4) check, review and foresee; 5) one automatic improvement pass if needed
-      if (evolve) {
-        const res = await checkVersion(c, steps, v, text);
-        const needs = res.errs.length || (res.review && res.review.score < 85);
-        if (needs) {
+      // 4) check and review; 5) improve. In Auto mode the agent keeps looping on its own —
+      // check, fix, re-check — until it reaches the quality target or runs out of rounds.
+      if (evolve || autoMode) {
+        const maxRounds = autoMode ? 5 : 1;
+        let cur = v, round = 0;
+        let res = await checkVersion(c, steps, cur, text);
+        const needs = (r) => r.errs.length || (r.review && r.review.score < target);
+        while (needs(res) && round < maxRounds) {
+          round++;
           const fixes = [...res.errs.map((e) => "- Runtime error: " + e), ...(res.review?.issues || []).filter((i) => i.severity !== "low").map((i) => `- [${i.severity}] ${i.area}: ${i.note}`), ...(res.review?.foresight || []).filter((f) => f.level === "warning").map((f) => `- Foresight (${f.affects}): ${f.note}`), ...res.found.map((f) => "- Lint: " + f)].join("\n");
-          steps.push({ label: "Self-improving: fixing what the checks found", state: "ok", text: fixes });
-          log("info", `Self-improve: v${v.n} → v${v.n + 1}`);
+          steps.push({ label: autoMode ? `Auto round ${round} of ${maxRounds}: improving toward ${target}/100` : "Self-improving: fixing what the checks found", state: "ok", text: fixes });
+          log("info", `${autoMode ? "Auto" : "Self"}-improve round ${round}: v${cur.n} → v${cur.n + 1}`);
+          const prevScore = res.review?.score;
           try {
-            const v2 = v.plan ? await parallelBuild(c, steps, { text, blueprint, n: v.plan.modules.length, fixes, plan: v.plan }) : await buildVersion(c, steps, { text, specs: [], blueprint, base: v, fixes, label: "Improving" });
-            const res2 = await checkVersion(c, steps, v2, text);
-            if (res.review && res2.review) log(res2.review.score >= res.review.score ? "ok" : "warn", `Self-improve: score ${res.review.score} → ${res2.review.score}`);
-          } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + v.n, state: "warn", text: e.message }); log("warn", "Self-improve: " + e.message); }
+            cur = cur.plan ? await parallelBuild(c, steps, { text, blueprint, n: cur.plan.modules.length, fixes, plan: cur.plan }) : await buildVersion(c, steps, { text, specs: [], blueprint, base: cur, fixes, label: "Improving" });
+          } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + cur.n, state: "warn", text: e.message }); log("warn", "Improve: " + e.message); break; }
+          res = await checkVersion(c, steps, cur, text);
+          if (prevScore != null && res.review) log(res.review.score >= prevScore ? "ok" : "warn", `Round ${round}: score ${prevScore} → ${res.review.score}`);
+          if (autoMode && prevScore != null && res.review && res.review.score <= prevScore && !res.errs.length) { steps.push({ label: "Auto mode stopped early: the score is no longer improving", state: "warn" }); break; }
+        }
+        if (autoMode) {
+          const sc = res.review?.score;
+          steps.push({ label: sc == null ? `Auto build finished after ${round} round${round === 1 ? "" : "s"}` : sc >= target ? `✦ Auto build reached ${sc}/100 (target ${target}) in ${round} round${round === 1 ? "" : "s"}` : `Auto build stopped at ${sc}/100 after ${round} round${round === 1 ? "" : "s"}`, state: sc != null && sc >= target ? "ok" : "warn", open: sc != null && sc < target });
+          if (sc != null) toast(sc >= target ? `Auto build hit ${sc}/100 ✨` : `Auto build reached ${sc}/100 (target ${target})`, sc >= target ? "#34d399" : "#f59e0b");
         }
       }
       stats.ok++; log("ok", `Run ${stats.runs} finished`, performance.now() - t0);
