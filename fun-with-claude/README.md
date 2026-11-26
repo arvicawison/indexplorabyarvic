@@ -68,6 +68,12 @@ a builder retries with the lighter `FUN_CLAUDE_LITE_MODEL` (default `claude-haik
 Every chat keeps a **feature ledger** of everything asked for so far; minds, huddle, Architect,
 builders and reviewer all receive it, so new versions keep every earlier feature and connect them.
 
+## Autonomous mode (Auto)
+Turn on **Auto ⟳** and pick a target score (85/90/95). After the first build the agent reviews it and,
+if it's below target or has runtime errors, keeps looping on its own — fix, rebuild, re-review — up to
+5 rounds, until it reaches the target. It stops early if the score stops improving. Each round reuses
+the module plan (so the 20 builders re-run only the fixes) and shows as its own step in the chat.
+
 ## Request time limit
 Netlify Free cuts every request at about 30 seconds. Every Claude call is therefore sized to finish
 in time: single-builder parts are capped at 2,600 tokens (`FUN_CLAUDE_PART_TOKENS`) with a hard 24s

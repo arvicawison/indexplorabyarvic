@@ -159,6 +159,8 @@ a{color:var(--blue)}
       <div class="pop"><button type="button" class="ib" id="mindsBtn" aria-expanded="false" aria-haspopup="true">Minds 8/8 ▾</button><div class="menu" id="mindsMenu" hidden></div></div>
       <button type="button" class="ib" id="sugBtn" aria-pressed="true" title="Live suggestions while you type">💡</button>
       <button type="button" class="ib" id="evoBtn" aria-pressed="true" title="Review every build and automatically improve weak ones">Self-improve</button>
+      <button type="button" class="ib" id="autoBtn" aria-pressed="false" title="Autonomous: keep planning, building, reviewing and fixing until the quality target is met">Auto ⟳</button>
+      <select id="target" aria-label="Quality target" title="Quality target the agent builds toward"><option value="85">target 85</option><option value="90" selected>target 90</option><option value="95">target 95</option></select>
       <button type="button" class="ib" id="stopBtn" hidden>■ Stop</button>
       <button class="send" id="sendBtn" type="submit">Build</button>
     </div>
@@ -580,6 +582,12 @@ a{color:var(--blue)}
   function syncToggles() { $("evoBtn").setAttribute("aria-pressed", evolve); $("sugBtn").setAttribute("aria-pressed", suggestOn); $("sugwrap").hidden = !suggestOn; }
   $("evoBtn").onclick = () => { evolve = !evolve; store.set("fwc.evolve", evolve ? "1" : "0"); syncToggles(); toast(evolve ? "Self-improve on: weak builds get one automatic improvement pass" : "Self-improve off", "#a855f7"); };
   $("sugBtn").onclick = () => { suggestOn = !suggestOn; store.set("fwc.suggest", suggestOn ? "1" : "0"); syncToggles(); };
+  let autoMode = pref("fwc.auto", false);
+  let target = (() => { const t = +(store.get("fwc.target") || 90); return [85, 90, 95].includes(t) ? t : 90; })();
+  $("target").value = String(target);
+  $("autoBtn").setAttribute("aria-pressed", autoMode);
+  $("autoBtn").onclick = () => { autoMode = !autoMode; store.set("fwc.auto", autoMode ? "1" : "0"); $("autoBtn").setAttribute("aria-pressed", autoMode); if (autoMode && !evolve) { evolve = true; store.set("fwc.evolve", "1"); syncToggles(); } toast(autoMode ? `Auto mode on — the agent builds and keeps improving on its own until it reaches ${target}/100` : "Auto mode off", "#a855f7"); };
+  $("target").onchange = () => { target = +$("target").value; store.set("fwc.target", String(target)); if (autoMode) toast(`Auto target set to ${target}/100`, "#a855f7"); };
   syncToggles();
 
   // ---------- live suggestions under the prompt bar, evolving with the user's own history ----------
@@ -785,19 +793,30 @@ a{color:var(--blue)}
         if (!v) v = await buildVersion(c, steps, { text, specs, blueprint, base, label: "Building" });
       } catch (e) { if (e.name === "AbortError") throw e; fail("Build failed", e.message); return; }
       showApp();
-      // 4) check, review and foresee; 5) one automatic improvement pass if needed
-      if (evolve) {
-        const res = await checkVersion(c, steps, v, text);
-        const needs = res.errs.length || (res.review && res.review.score < 85);
-        if (needs) {
+      // 4) check and review; 5) improve. In Auto mode the agent keeps looping on its own —
+      // check, fix, re-check — until it reaches the quality target or runs out of rounds.
+      if (evolve || autoMode) {
+        const maxRounds = autoMode ? 5 : 1;
+        let cur = v, round = 0;
+        let res = await checkVersion(c, steps, cur, text);
+        const needs = (r) => r.errs.length || (r.review && r.review.score < target);
+        while (needs(res) && round < maxRounds) {
+          round++;
           const fixes = [...res.errs.map((e) => "- Runtime error: " + e), ...(res.review?.issues || []).filter((i) => i.severity !== "low").map((i) => `- [${i.severity}] ${i.area}: ${i.note}`), ...(res.review?.foresight || []).filter((f) => f.level === "warning").map((f) => `- Foresight (${f.affects}): ${f.note}`), ...res.found.map((f) => "- Lint: " + f)].join("\n");
-          steps.push({ label: "Self-improving: fixing what the checks found", state: "ok", text: fixes });
-          log("info", `Self-improve: v${v.n} → v${v.n + 1}`);
+          steps.push({ label: autoMode ? `Auto round ${round} of ${maxRounds}: improving toward ${target}/100` : "Self-improving: fixing what the checks found", state: "ok", text: fixes });
+          log("info", `${autoMode ? "Auto" : "Self"}-improve round ${round}: v${cur.n} → v${cur.n + 1}`);
+          const prevScore = res.review?.score;
           try {
-            const v2 = v.plan ? await parallelBuild(c, steps, { text, blueprint, n: v.plan.modules.length, fixes, plan: v.plan }) : await buildVersion(c, steps, { text, specs: [], blueprint, base: v, fixes, label: "Improving" });
-            const res2 = await checkVersion(c, steps, v2, text);
-            if (res.review && res2.review) log(res2.review.score >= res.review.score ? "ok" : "warn", `Self-improve: score ${res.review.score} → ${res2.review.score}`);
-          } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + v.n, state: "warn", text: e.message }); log("warn", "Self-improve: " + e.message); }
+            cur = cur.plan ? await parallelBuild(c, steps, { text, blueprint, n: cur.plan.modules.length, fixes, plan: cur.plan }) : await buildVersion(c, steps, { text, specs: [], blueprint, base: cur, fixes, label: "Improving" });
+          } catch (e) { if (e.name === "AbortError") throw e; steps.push({ label: "Improvement pass failed: keeping v" + cur.n, state: "warn", text: e.message }); log("warn", "Improve: " + e.message); break; }
+          res = await checkVersion(c, steps, cur, text);
+          if (prevScore != null && res.review) log(res.review.score >= prevScore ? "ok" : "warn", `Round ${round}: score ${prevScore} → ${res.review.score}`);
+          if (autoMode && prevScore != null && res.review && res.review.score <= prevScore && !res.errs.length) { steps.push({ label: "Auto mode stopped early: the score is no longer improving", state: "warn" }); break; }
+        }
+        if (autoMode) {
+          const sc = res.review?.score;
+          steps.push({ label: sc == null ? `Auto build finished after ${round} round${round === 1 ? "" : "s"}` : sc >= target ? `✦ Auto build reached ${sc}/100 (target ${target}) in ${round} round${round === 1 ? "" : "s"}` : `Auto build stopped at ${sc}/100 after ${round} round${round === 1 ? "" : "s"}`, state: sc != null && sc >= target ? "ok" : "warn", open: sc != null && sc < target });
+          if (sc != null) toast(sc >= target ? `Auto build hit ${sc}/100 ✨` : `Auto build reached ${sc}/100 (target ${target})`, sc >= target ? "#34d399" : "#f59e0b");
         }
       }
       stats.ok++; log("ok", `Run ${stats.runs} finished`, performance.now() - t0);
