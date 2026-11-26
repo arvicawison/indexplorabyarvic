@@ -116,3 +116,5 @@ An App Generator run with all minds = 8 short planning calls + 1 huddle + 1 to 4
 (up to 8,000 output tokens each). There is no per-visitor rate limit (owner's choice); `FUN_CLAUDE_PAUSED=true` stops everything at once.
 A generation with all eight minds = 9 Claude calls. Each visitor IP is limited to 54 calls a
 minute (about 6 generations). Watch usage in Netlify (or your Anthropic console if using your key).
+
+<!-- combined preview of the full Fun with Claude section -->
