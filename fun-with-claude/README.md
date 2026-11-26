@@ -56,6 +56,20 @@ Optional: `FUN_CLAUDE_MODEL` (default `claude-sonnet-5-5`), `FUN_CLAUDE_REQUIRE_
   (Netlify Blobs store `fwc-showcase`) after an all-ages safety check; anyone can open it at
   `/fun-with-claude/view/#s=<id>` or remix it. The sharing device keeps a private owner key to remove it.
 
+- `/fun-with-claude/wellbeing/`: Wellbeing Studio. Break rhythm timer (optional browser
+  notifications), 20-20-20 eye rest, box breathing, guided stretches, water tracker and a private
+  mood check-in with a gentle "talk to someone" note after several low days. All data stays in the
+  visitor's browser (`fwc.well.*`, "Clear my data" removes it). General wellness, not medical advice.
+- `/fun-with-claude/status/`: the hourly health pulse (reads `GET /api/fun-with-claude/status`).
+
+## Hourly health pulse ("pests out")
+`netlify/functions/fun-with-claude-pulse.mts` is a scheduled function (17 minutes past every hour,
+production only; "Run now" in Netlify runs it on demand). It checks Claude with a tiny request,
+checks every Pantheon creation and Showcase app is well-formed and safe to show, moves anything broken
+to the `fwc-quarantine` store (restorable for 30 days, then cleared), and records the pulse in
+`fwc-health` (one week kept). It can't change the site's code: code changes still go through a pull
+request a person approves.
+
 ## Parallel builders ("RAM split") and the feature ledger
 After the minds and the huddle, the **Architect** splits the app into up to 20 modules and writes a
 shared shell: design tokens, layout with one slot per module, and a tiny `window.App` event/state
